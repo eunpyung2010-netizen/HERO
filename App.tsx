@@ -8,9 +8,9 @@ import SettingsModal from './components/SettingsModal';
 import ImageEditorModal from './components/ImageEditorModal';
 import ClassSelectionModal from './components/ClassSelectionModal';
 import MobileControls from './components/MobileControls';
-import { Player, Quest, Enemy, WeaponType, KeyBindings, ClassType } from './types';
+import { Player, Quest, Enemy, WeaponType, KeyBindings, ClassType, MobileControlSettings } from './types';
 import { generateQuest } from './services/geminiService';
-import { UPGRADE_COSTS, BIOMES, DEFAULT_KEY_BINDINGS, CLASS_INFOS, ADVANCED_CLASS_NAMES } from './constants';
+import { UPGRADE_COSTS, BIOMES, DEFAULT_KEY_BINDINGS, CLASS_INFOS, ADVANCED_CLASS_NAMES, DEFAULT_MOBILE_SETTINGS } from './constants';
 
 const App: React.FC = () => {
   const gameRef = useRef<GameCanvasHandle>(null);
@@ -35,6 +35,7 @@ const App: React.FC = () => {
   
   const [stageInfo, setStageInfo] = useState({ level: 1, name: 'Peaceful Forest' });
   const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
+  const [mobileSettings, setMobileSettings] = useState<MobileControlSettings>(DEFAULT_MOBILE_SETTINGS);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
   
   // Layout State
@@ -335,6 +336,7 @@ const App: React.FC = () => {
             showVirtualControls={!isPortrait} // Hide overlay controls in portrait
             forceMenuOpen={mobileMenuOpen}
             onCloseMenu={() => setMobileMenuOpen(false)}
+            mobileSettings={mobileSettings}
           />
         )}
 
@@ -343,7 +345,7 @@ const App: React.FC = () => {
         {isShopOpen && playerStats && <ShopModal player={playerStats} onClose={handleCloseShop} onPurchase={handlePurchase} />}
         {isMapOpen && playerStats && <WorldMap currentStage={stageInfo.level} maxStageReached={playerStats.maxStageReached} onClose={handleCloseMap} />}
         {isSkillsOpen && playerStats && <SkillTreeModal player={playerStats} onClose={handleCloseSkills} onUpgrade={handleUpgradeSkill} onAssignSlot={handleAssignSkillSlot} keyBindings={keyBindings} />}
-        {isSettingsOpen && <SettingsModal bindings={keyBindings} onSave={setKeyBindings} onClose={handleCloseSettings} onUnlockAll={handleUnlockAll} />}
+        {isSettingsOpen && <SettingsModal bindings={keyBindings} onSave={setKeyBindings} mobileSettings={mobileSettings} onSaveMobileSettings={setMobileSettings} onClose={handleCloseSettings} onUnlockAll={handleUnlockAll} />}
         {isImageEditorOpen && <ImageEditorModal onClose={handleCloseImageEditor} onApplyBackground={handleApplyBackground} />}
         
         {isPaused && !isGameOver && !isClassSelectionOpen && (

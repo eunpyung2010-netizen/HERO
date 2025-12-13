@@ -1,3 +1,4 @@
+
 export enum Direction {
   LEFT = -1,
   RIGHT = 1,
@@ -195,4 +196,13 @@ export interface KeyBindings {
     SKILL_3: string;
     SKILL_4: string;
     SKILL_5: string;
+}
+
+export interface MobileControlSettings {
+    dpadX: number; // % from left
+    dpadY: number; // % from bottom
+    actionX: number; // % from right
+    actionY: number; // % from bottom
+    scale: number; // Scale multiplier
+    opacity: number; // 0.0 - 1.0
 }

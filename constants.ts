@@ -1,4 +1,4 @@
-import { Skill, KeyBindings, ClassType, WeaponType } from './types';
+import { Skill, KeyBindings, ClassType, WeaponType, MobileControlSettings } from './types';
 
 export const GRAVITY = 0.6;
 export const FRICTION = 0.8;
@@ -271,4 +271,13 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
     SKILL_3: 'KeyD', 
     SKILL_4: 'KeyF', 
     SKILL_5: 'KeyG' 
+};
+
+export const DEFAULT_MOBILE_SETTINGS: MobileControlSettings = {
+    dpadX: 5,
+    dpadY: 5,
+    actionX: 5,
+    actionY: 5,
+    scale: 1.2,
+    opacity: 0.8
 };
