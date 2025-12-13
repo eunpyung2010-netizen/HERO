@@ -10,17 +10,17 @@ interface WorldMapProps {
 
 const WorldMap: React.FC<WorldMapProps> = ({ currentStage, maxStageReached, onClose }) => {
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-8 animate-in fade-in duration-300">
-            <div className="bg-slate-900 border-2 border-yellow-600 rounded-2xl shadow-2xl w-full max-w-4xl h-[80%] flex flex-col overflow-hidden relative">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300">
+            <div className="bg-slate-900 border-2 border-yellow-600 rounded-2xl shadow-2xl w-full max-w-4xl h-full md:h-[80%] flex flex-col overflow-hidden relative">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-yellow-800 to-yellow-900 p-4 flex justify-between items-center border-b border-yellow-500 shadow-md z-10">
+                <div className="bg-gradient-to-r from-yellow-800 to-yellow-900 p-4 flex justify-between items-center border-b border-yellow-500 shadow-md z-10 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="bg-black/30 p-2 rounded-full border border-yellow-400/50">
                             <MapPin className="text-yellow-400 w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-white drop-shadow-md tracking-wider">WORLD MAP</h2>
-                            <p className="text-yellow-200/60 text-xs font-mono">현재 스테이지: {currentStage} / 최고 기록: {maxStageReached}</p>
+                            <h2 className="text-xl md:text-2xl font-black text-white drop-shadow-md tracking-wider">WORLD MAP</h2>
+                            <p className="text-yellow-200/60 text-xs font-mono">현재: {currentStage} / 최고: {maxStageReached}</p>
                         </div>
                     </div>
                     <button 
@@ -32,8 +32,8 @@ const WorldMap: React.FC<WorldMapProps> = ({ currentStage, maxStageReached, onCl
                 </div>
 
                 {/* Map Content */}
-                <div className="flex-1 overflow-y-auto p-8 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-900">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-900">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                         {BIOMES.map((biome, index) => {
                             const isUnlocked = maxStageReached >= biome.startStage || index === 0;
                             const isCurrent = currentStage >= biome.startStage && currentStage <= biome.endStage;
@@ -56,7 +56,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ currentStage, maxStageReached, onCl
                             return (
                                 <div 
                                     key={biome.name}
-                                    className={`relative group rounded-xl border-2 ${borderColor} ${bgColor} p-4 transition-all duration-300 flex flex-col gap-3 min-h-[160px]`}
+                                    className={`relative group rounded-xl border-2 ${borderColor} ${bgColor} p-4 transition-all duration-300 flex flex-col gap-3 min-h-[160px] active:scale-95`}
                                 >
                                     {/* Background Preview (Simulated with gradient) */}
                                     <div 
@@ -108,7 +108,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ currentStage, maxStageReached, onCl
                 </div>
 
                 {/* Footer */}
-                <div className="bg-slate-900 border-t border-white/10 p-3 text-center text-xs text-gray-500 font-mono">
+                <div className="bg-slate-900 border-t border-white/10 p-3 text-center text-xs text-gray-500 font-mono flex-shrink-0">
                     새로운 지역을 탐험하여 지도를 완성하세요.
                 </div>
             </div>

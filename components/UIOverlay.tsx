@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Player, Quest, Enemy, WeaponType, KeyBindings } from '../types';
-import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Camera, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp } from 'lucide-react';
+import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Camera, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp, Maximize2, Minimize2, Menu, X } from 'lucide-react';
 import { WEAPONS, SKILL_TREE, ADVANCED_CLASS_NAMES } from '../constants';
 
 interface UIOverlayProps {
@@ -17,7 +17,7 @@ interface UIOverlayProps {
   onOpenSettings?: () => void;
   onOpenImageEditor?: () => void;
   onSwitchWeapon?: (weapon: WeaponType) => void;
-  onJobAdvance?: () => void; // New prop
+  onJobAdvance?: () => void; 
   stageLevel: number;
   biomeName: string;
   keyBindings: KeyBindings;
@@ -32,6 +32,10 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
 
   const canAdvance = player.level >= 30 && !player.isAdvanced;
 
+  // Full Screen State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Mobile check
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -41,17 +45,31 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    }
+  };
+
   // Virtual Key Helper
   const simulateKey = (code: string, type: 'keydown' | 'keyup') => {
       window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
   };
 
-  const MobileButton = ({ code, icon: Icon, className, color = "bg-slate-700/50" }: any) => (
+  const MobileButton = ({ code, icon: Icon, className, color = "bg-slate-700/50", label }: any) => (
       <button
           className={`rounded-full backdrop-blur-sm border-2 border-white/20 shadow-lg active:scale-95 transition-transform flex items-center justify-center touch-none select-none ${color} ${className}`}
           onPointerDown={(e) => {
               e.preventDefault();
-              e.stopPropagation(); // Stop propagation to canvas
+              e.stopPropagation(); 
               simulateKey(code, 'keydown');
           }}
           onPointerUp={(e) => {
@@ -66,7 +84,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
           }}
           onContextMenu={(e) => e.preventDefault()}
       >
-          <Icon className="text-white/90" size={24} />
+          {Icon ? <Icon className="text-white/90" size={24} /> : <span className="text-white font-bold">{label}</span>}
       </button>
   );
 
@@ -97,10 +115,8 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
       { label: 'G', code: keyBindings.SKILL_5 },
   ];
 
-  // Weapon List - Dynamically add advanced weapon if unlocked
   const displayWeapons = ['Sword', 'Spear', 'Bow', 'Gun'];
   if (player.unlockedWeapons.length > 4) {
-      // Find the advanced weapon(s)
       const advanced = player.unlockedWeapons.filter(w => !displayWeapons.includes(w));
       displayWeapons.push(...advanced);
   }
@@ -169,7 +185,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
              </div>
         </div>
 
-        {/* CENTER: Stage Info & Job Advance Button (Hidden on very small mobile to save space) */}
+        {/* CENTER: Stage Info */}
         <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-4 flex-col items-center pointer-events-none">
             <div className="bg-black/60 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 mb-1">
                 <span className="text-yellow-400 font-bold text-xs tracking-[0.2em]">STAGE {stageLevel}</span>
@@ -177,8 +193,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
             <div className="text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide">
                 {biomeName}
             </div>
-            
-            {canAdvance && (
+             {canAdvance && (
                 <button 
                     onClick={onJobAdvance}
                     className="mt-4 pointer-events-auto bg-gradient-to-r from-yellow-600 to-red-600 hover:from-yellow-500 hover:to-red-500 text-white font-black py-2 px-6 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-bounce border-2 border-white/50"
@@ -188,9 +203,17 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
             )}
         </div>
 
-        {/* RIGHT: Menu Buttons & Quest */}
+        {/* RIGHT: Menu Buttons */}
         <div className="flex flex-col items-end gap-3 scale-90 origin-top-right md:scale-100">
-             <div className="flex gap-2">
+             {/* Desktop Menu - Hidden on Mobile */}
+             <div className="hidden lg:flex gap-2">
+                 <button 
+                    onClick={toggleFullScreen}
+                    className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg border border-slate-600 shadow-lg active:scale-95 transition-all group"
+                    title="전체화면"
+                 >
+                     {isFullscreen ? <Minimize2 className="w-5 h-5"/> : <Maximize2 className="w-5 h-5"/>}
+                 </button>
                  <button 
                     onClick={onOpenImageEditor}
                     className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg border border-slate-600 shadow-lg active:scale-95 transition-all group relative"
@@ -233,6 +256,16 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                      <Settings className="w-5 h-5 group-hover:text-gray-300" />
                  </button>
              </div>
+             
+             {/* Mobile Menu Toggle - Visible on Mobile */}
+             <div className="lg:hidden">
+                 <button 
+                    onClick={() => setIsMobileMenuOpen(true)}
+                    className="bg-slate-800/90 hover:bg-slate-700 text-white p-3 rounded-full border border-slate-500 shadow-xl active:scale-95 transition-all"
+                 >
+                     <Menu className="w-6 h-6" />
+                 </button>
+             </div>
 
              <div className="bg-slate-900/90 text-white p-3 rounded-lg border-l-4 border-yellow-500 shadow-xl w-64 backdrop-blur-sm pointer-events-auto">
                 <div className="flex items-center gap-2 mb-1">
@@ -272,10 +305,53 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
         </div>
       </div>
 
-      {/* VIRTUAL CONTROLS FOR MOBILE (Only visible on small screens) */}
+      {/* MOBILE MENU OVERLAY */}
+      {isMobileMenuOpen && (
+          <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-lg p-6 flex flex-col pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-2xl font-black text-white">메뉴 (Menu)</h2>
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-2 bg-slate-800 rounded-full border border-slate-600 text-white"
+                  >
+                      <X size={24} />
+                  </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 flex-1 overflow-y-auto">
+                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenShop(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-yellow-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                       <ShoppingBag size={40} className="text-yellow-400" />
+                       <span className="text-white font-bold text-lg">상점 (Shop)</span>
+                   </button>
+                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenSkills && onOpenSkills(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-green-500 rounded-xl p-6 gap-3 active:scale-95 transition-all relative">
+                       <Zap size={40} className="text-green-400" />
+                       <span className="text-white font-bold text-lg">스킬 (Skills)</span>
+                       {player.sp > 0 && <span className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-ping"/>}
+                   </button>
+                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenMap(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-blue-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                       <Map size={40} className="text-blue-400" />
+                       <span className="text-white font-bold text-lg">지도 (Map)</span>
+                   </button>
+                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenSettings && onOpenSettings(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-gray-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                       <Settings size={40} className="text-gray-300" />
+                       <span className="text-white font-bold text-lg">설정 (Settings)</span>
+                   </button>
+                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenImageEditor && onOpenImageEditor(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                       <Camera size={40} className="text-pink-400" />
+                       <span className="text-white font-bold text-lg">AI 스튜디오</span>
+                   </button>
+                   <button onClick={() => { setIsMobileMenuOpen(false); toggleFullScreen(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-purple-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                       {isFullscreen ? <Minimize2 size={40} className="text-purple-400"/> : <Maximize2 size={40} className="text-purple-400"/>}
+                       <span className="text-white font-bold text-lg">전체화면</span>
+                   </button>
+              </div>
+          </div>
+      )}
+
+      {/* VIRTUAL CONTROLS FOR MOBILE */}
       <div className="lg:hidden absolute bottom-0 left-0 w-full h-full pointer-events-none z-40">
            {/* D-Pad (Left) */}
-           <div className="absolute bottom-24 left-6 pointer-events-auto">
+           <div className="absolute bottom-8 left-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-left">
                 <div className="grid grid-cols-3 gap-1">
                     <div />
                     <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-14 h-14" />
@@ -290,22 +366,47 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
            </div>
 
            {/* Action Buttons (Right) */}
-           <div className="absolute bottom-24 right-6 pointer-events-auto flex items-end gap-4">
-                <MobileButton 
-                    code={keyBindings.ATTACK} 
-                    icon={Sword} 
-                    className="w-20 h-20 bg-red-800/60 border-red-400" 
-                />
-                <MobileButton 
-                    code={keyBindings.JUMP} 
-                    icon={ChevronsUp} 
-                    className="w-16 h-16 bg-blue-800/60 border-blue-400 mb-8" 
-                />
+           <div className="absolute bottom-8 right-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-right">
+                <div className="relative w-48 h-48">
+                    {/* Main Actions */}
+                    <MobileButton 
+                        code={keyBindings.ATTACK} 
+                        icon={Sword} 
+                        className="absolute bottom-0 right-0 w-20 h-20 bg-red-800/60 border-red-400 rounded-full z-10" 
+                    />
+                    <MobileButton 
+                        code={keyBindings.JUMP} 
+                        icon={ChevronsUp} 
+                        className="absolute bottom-4 right-24 w-16 h-16 bg-blue-800/60 border-blue-400 rounded-full" 
+                    />
+
+                    {/* Magic Keys (Skills) - Arc placement */}
+                    <MobileButton 
+                        code={keyBindings.SKILL_1} 
+                        label="A"
+                        className="absolute top-12 right-24 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                    />
+                    <MobileButton 
+                        code={keyBindings.SKILL_2} 
+                        label="S"
+                        className="absolute top-4 right-16 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                    />
+                    <MobileButton 
+                        code={keyBindings.SKILL_3} 
+                        label="D"
+                        className="absolute top-0 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                    />
+                    <MobileButton 
+                        code={keyBindings.SKILL_4} 
+                        label="F"
+                        className="absolute -top-12 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                    />
+                </div>
            </div>
            
            {/* Mobile Job Advance Alert */}
            {canAdvance && (
-               <div className="absolute bottom-40 left-1/2 -translate-x-1/2 pointer-events-auto">
+               <div className="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-auto">
                     <button 
                         onClick={onJobAdvance}
                         className="bg-yellow-600 text-white text-xs font-bold px-4 py-2 rounded-full animate-bounce shadow-lg border border-yellow-300"
@@ -319,7 +420,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
       {/* BOTTOM SECTION (HUD) */}
       <div className="flex justify-between items-end pointer-events-none">
           {/* Logs */}
-          <div className="w-60 md:w-96 h-32 md:h-40 overflow-hidden flex flex-col justify-end pointer-events-auto mask-image-gradient p-4">
+          <div className="w-48 md:w-96 h-24 md:h-40 overflow-hidden flex flex-col justify-end pointer-events-auto mask-image-gradient p-4 mb-20 lg:mb-0">
               <div className="space-y-1">
                   {logs.slice(0, 5).map((log, i) => (
                       <div key={i} className="text-xs text-white/90 drop-shadow-md bg-black/40 px-2 py-0.5 rounded w-fit animate-in fade-in slide-in-from-left-2">
@@ -432,8 +533,8 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               })}
           </div>
           
-          {/* Mobile Essential HUD (Potions only) */}
-          <div className="lg:hidden flex gap-4 pointer-events-auto p-4 absolute bottom-0 left-1/2 -translate-x-1/2 z-30">
+          {/* Mobile Essential HUD (Potions only) - moved to top left corner on mobile to avoid overlap with controls */}
+          <div className="lg:hidden flex flex-col gap-2 pointer-events-auto p-4 absolute top-20 left-4 z-30">
                 <div 
                     onClick={() => simulateKey(keyBindings.POTION_HP, 'keydown')}
                     className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"

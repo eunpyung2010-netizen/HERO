@@ -40,7 +40,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     onStatsUpdate, onEventLog, onGameOver, onQuestUpdate, onQuestComplete, gameActive, currentQuest, keyBindings, backgroundImage, initialClass
 }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const requestRef = useRef<number>();
+    const requestRef = useRef<number | null>(null);
     const keysPressed = useRef<Set<string>>(new Set());
     const mouseRef = useRef<{x: number, y: number}>({ x: 0, y: 0 });
     
@@ -1497,7 +1497,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
             }
             if (enemy.stunTimer > 0) {
                 enemy.stunTimer--;
-                if(Math.random() < 0.1) createParticle(enemy.x, enemy.y, "ðŸ’«", "yellow", 20);
+                if(Math.random() < 0.1) createParticle(enemy.x, enemy.y, "í ½í²«", "yellow", 20);
                 return;
             }
 
@@ -2069,7 +2069,9 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     useEffect(() => {
         requestRef.current = requestAnimationFrame(tick);
         // REMOVED loadStage(1) from here to prevent reset on menu open/close
-        return () => cancelAnimationFrame(requestRef.current!);
+        return () => {
+            if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
+        };
     }, [gameActive]);
 
     // Input Handling (remains same)

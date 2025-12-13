@@ -15,10 +15,10 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
     const mpCost = Math.floor(UPGRADE_COSTS.MP.base * Math.pow(UPGRADE_COSTS.MP.scale, Math.floor((player.maxMp - 100) / 30)));
 
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-slate-900 border-2 border-yellow-500 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="bg-slate-900 border-2 border-yellow-500 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-full">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-yellow-700 to-yellow-600 p-4 flex justify-between items-center border-b border-yellow-400">
+                <div className="bg-gradient-to-r from-yellow-700 to-yellow-600 p-4 flex justify-between items-center border-b border-yellow-400 flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <ShoppingBag className="text-white w-6 h-6" />
                         <h2 className="text-xl font-black text-white drop-shadow-md">모험가 상점</h2>
@@ -29,7 +29,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 grid grid-cols-2 gap-6">
+                <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
                     {/* Consumables */}
                     <div className="space-y-4">
                         <h3 className="text-yellow-400 font-bold border-b border-yellow-400/30 pb-2 mb-2">소모품</h3>
@@ -45,7 +45,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                             <button 
                                 onClick={() => onPurchase('POTION_HP')}
                                 disabled={player.gold < UPGRADE_COSTS.POTION}
-                                className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded flex items-center gap-1"
+                                className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded flex items-center gap-1 active:scale-95 transition-transform"
                             >
                                 {UPGRADE_COSTS.POTION} G
                             </button>
@@ -62,7 +62,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                             <button 
                                 onClick={() => onPurchase('POTION_MP')}
                                 disabled={player.gold < UPGRADE_COSTS.POTION}
-                                className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded flex items-center gap-1"
+                                className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded flex items-center gap-1 active:scale-95 transition-transform"
                             >
                                 {UPGRADE_COSTS.POTION} G
                             </button>
@@ -85,7 +85,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                             <button 
                                 onClick={() => onPurchase('UPGRADE_ATK')}
                                 disabled={player.gold < atkCost}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded"
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded active:scale-95 transition-transform"
                             >
                                 {atkCost} G
                             </button>
@@ -103,7 +103,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                             <button 
                                 onClick={() => onPurchase('UPGRADE_HP')}
                                 disabled={player.gold < hpCost}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded"
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded active:scale-95 transition-transform"
                             >
                                 {hpCost} G
                             </button>
@@ -121,7 +121,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                             <button 
                                 onClick={() => onPurchase('UPGRADE_MP')}
                                 disabled={player.gold < mpCost}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded"
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded active:scale-95 transition-transform"
                             >
                                 {mpCost} G
                             </button>
@@ -130,9 +130,9 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
                 </div>
 
                 {/* Footer */}
-                <div className="bg-slate-800 p-4 flex justify-between items-center text-sm text-gray-400">
+                <div className="bg-slate-800 p-4 flex justify-between items-center text-sm text-gray-400 flex-shrink-0">
                      <div>보유 골드: <span className="text-yellow-400 font-bold">{player.gold.toLocaleString()} G</span></div>
-                     <div>단축키 [B] 또는 [Esc]로 닫기</div>
+                     <div className="text-xs">터치하여 구매</div>
                 </div>
             </div>
         </div>
