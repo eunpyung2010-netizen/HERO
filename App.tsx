@@ -35,6 +35,9 @@ const App: React.FC = () => {
   const [stageInfo, setStageInfo] = useState({ level: 1, name: 'Peaceful Forest' });
   const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
+  
+  // Scaling State
+  const [scale, setScale] = useState(1);
 
   // Derived state for game loop
   const isPaused = isShopOpen || isMapOpen || isSkillsOpen || isSettingsOpen || isImageEditorOpen || isClassSelectionOpen;
@@ -47,6 +50,30 @@ const App: React.FC = () => {
   // Sync refs
   useEffect(() => { currentQuestRef.current = currentQuest; }, [currentQuest]);
 
+  // Handle Scaling
+  useEffect(() => {
+    const handleResize = () => {
+       const targetW = 1024;
+       const targetH = 600;
+       const windowW = window.innerWidth;
+       const windowH = window.innerHeight;
+       
+       // Calculate scale to fit window with some margin
+       const scaleX = windowW / targetW;
+       const scaleY = windowH / targetH;
+       
+       // Choose the smaller scale to ensure full fit
+       // Clamp max scale to 1.0 (optional, but good for pixel art sharpness if not using pixelated render)
+       // We allow < 1 for mobile.
+       const newScale = Math.min(scaleX, scaleY);
+       setScale(newScale * 0.98); // 98% to prevent scrollbars from rounding errors
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleClassSelect = (classType: ClassType) => {
       const info = CLASS_INFOS[classType];
       
@@ -56,7 +83,7 @@ const App: React.FC = () => {
           hp: 100, maxHp: 100, mp: 100, maxMp: 100,
           level: 1, exp: 0, maxExp: 100, attack: 10,
           name: info.name, classType: classType, isAdvanced: false,
-          isAttacking: false, attackCooldown: 0, maxAttackCooldown: 20,
+          isAttacking: false, isDownAttacking: false, attackCooldown: 0, maxAttackCooldown: 20,
           currentWeapon: info.weapon, unlockedWeapons: [info.weapon],
           weaponRotation: 0, invincibilityTimer: 0, gold: 0, 
           hpPotions: 3, mpPotions: 3, maxStageReached: 1, sp: 0, 
@@ -268,15 +295,18 @@ const App: React.FC = () => {
     }
   }, [stageInfo.level, gameStarted, customBackground]);
 
-  // Render Class Selection First
-  if (isClassSelectionOpen) {
-      return <ClassSelectionModal onSelectClass={handleClassSelect} />;
-  }
-
-  // Render Game
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-800 p-4 select-none">
-      <div className="relative w-[1024px] h-[600px] shadow-2xl rounded-lg overflow-hidden ring-8 ring-slate-900">
+    <div className="flex items-center justify-center min-h-screen bg-black overflow-hidden select-none">
+        
+      {/* Game Wrapper with Scaling */}
+      <div 
+        className="relative shadow-2xl overflow-hidden bg-slate-800 transition-transform duration-200 origin-center"
+        style={{ 
+            width: 1024, 
+            height: 600,
+            transform: `scale(${scale})`
+        }}
+      >
         <GameCanvas 
           ref={gameRef}
           onStatsUpdate={handleStatsUpdate} 
@@ -311,6 +341,14 @@ const App: React.FC = () => {
             onJobAdvance={handleJobAdvance}
           />
         )}
+
+        {/* Render Class Selection on top of game canvas logic */}
+        {isClassSelectionOpen && (
+           <div className="absolute inset-0 z-50">
+               <ClassSelectionModal onSelectClass={handleClassSelect} />
+           </div>
+        )}
+
         {isShopOpen && playerStats && (
             <ShopModal 
                 player={playerStats} 
@@ -349,16 +387,11 @@ const App: React.FC = () => {
             />
         )}
         
-        {isPaused && !isGameOver && (
+        {isPaused && !isGameOver && !isClassSelectionOpen && (
             <div className="absolute top-4 right-4 bg-yellow-500 text-black font-bold px-3 py-1 rounded shadow animate-pulse pointer-events-none z-40">
                 PAUSED
             </div>
         )}
-      </div>
-      
-      {/* Mobile/Small screen warning */}
-      <div className="fixed bottom-4 text-gray-500 text-xs text-center w-full pointer-events-none md:block hidden">
-        PC 환경의 키보드 조작에 최적화되어 있습니다.
       </div>
     </div>
   );
