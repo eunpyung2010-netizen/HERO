@@ -70,8 +70,9 @@ const App: React.FC = () => {
            const targetH = 600;
            const scaleX = windowW / targetW;
            const scaleY = windowH / targetH;
-           const newScale = Math.min(scaleX, scaleY);
-           setScale(newScale * 0.98); 
+           // Use a safer margin to ensure it fits well within browser UI
+           const newScale = Math.min(scaleX, scaleY) * 0.98;
+           setScale(newScale); 
        }
     };
 
@@ -276,20 +277,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`flex items-center justify-center bg-black overflow-hidden select-none ${isPortrait ? 'flex-col h-[100dvh]' : 'min-h-screen'}`}>
+    // Use 100dvh for reliable mobile height
+    <div className="w-full h-[100dvh] bg-black overflow-hidden select-none flex flex-col relative touch-none">
         
       {/* 
          GAME CONTAINER 
-         - In Portrait: Takes top part of screen, width fits screen, height based on aspect ratio
-         - In Landscape: Centered, scaled box
+         - Portrait: Standard flow
+         - Landscape: Absolute centered
       */}
       <div 
-        className={`relative shadow-2xl bg-slate-800 overflow-hidden flex-shrink-0 transition-transform duration-0 ${isPortrait ? 'origin-top-left' : 'origin-center'}`}
+        className={`shadow-2xl bg-slate-800 overflow-hidden flex-shrink-0 transition-transform duration-0 z-0
+            ${isPortrait ? 'origin-top-left' : 'absolute top-1/2 left-1/2 origin-center'}
+        `}
         style={{ 
             width: 1024, 
             height: 600,
-            transform: `scale(${scale})`,
-            marginBottom: isPortrait ? `-${600 - (600 * scale)}px` : 0, // Remove empty space caused by scale only in portrait
+            transform: isPortrait 
+                ? `scale(${scale})` 
+                : `translate(-50%, -50%) scale(${scale})`, // Accurate center for landscape
+            // Remove empty space caused by scale only in portrait flow
+            marginBottom: isPortrait ? `-${600 - (600 * scale)}px` : 0,
             marginRight: isPortrait ? `-${1024 - (1024 * scale)}px` : 0 
         }}
       >

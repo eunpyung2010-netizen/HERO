@@ -78,7 +78,7 @@ export const WEAPONS: Record<string, { emoji: string, range: number, damageMult:
   Sword: { emoji: '🗡️', range: 80, damageMult: 1.0, cooldown: 20, speed: 0, type: 'melee' },
   Spear: { emoji: '🔱', range: 170, damageMult: 1.2, cooldown: 35, speed: 0, type: 'melee' }, // Range Increased
   Bow: { emoji: '🏹', range: 600, damageMult: 0.8, cooldown: 30, speed: 12, type: 'ranged', projectile: '➹' },
-  Gun: { emoji: '🔫', range: 800, damageMult: 0.6, cooldown: 10, speed: 20, type: 'ranged', projectile: '•' }, 
+  Gun: { emoji: '🔫', range: 800, damageMult: 0.6, cooldown: 10, speed: 20, type: 'ranged', projectile: '🔴' }, 
   
   // Advanced Weapons
   Greatsword: { emoji: '⚔️', range: 120, damageMult: 2.5, cooldown: 60, speed: 0, type: 'melee' }, // Warrior -> Berserker
