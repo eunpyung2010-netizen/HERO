@@ -21,10 +21,13 @@ interface UIOverlayProps {
   stageLevel: number;
   biomeName: string;
   keyBindings: KeyBindings;
+  showVirtualControls?: boolean; // New prop to control visibility
+  forceMenuOpen?: boolean;
+  onCloseMenu?: () => void;
 }
 
 const UIOverlay: React.FC<UIOverlayProps> = ({ 
-  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onOpenImageEditor, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings
+  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onOpenImageEditor, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu
 }) => {
   const hpPercent = (player.hp / player.maxHp) * 100;
   const mpPercent = (player.mp / player.maxMp) * 100;
@@ -36,14 +39,14 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Mobile check
-  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+      if (forceMenuOpen) setIsMobileMenuOpen(true);
+  }, [forceMenuOpen]);
+
+  const handleCloseMenu = () => {
+      setIsMobileMenuOpen(false);
+      if (onCloseMenu) onCloseMenu();
+  };
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -106,7 +109,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
       )
   }
 
-  // Hotkey mapping for skill slots (5 to 9 -> A to G)
+  // Hotkey mapping for skill slots
   const skillHotkeys = [
       { label: 'A', code: keyBindings.SKILL_1 },
       { label: 'S', code: keyBindings.SKILL_2 },
@@ -257,15 +260,17 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                  </button>
              </div>
              
-             {/* Mobile Menu Toggle - Visible on Mobile */}
-             <div className="lg:hidden">
-                 <button 
-                    onClick={() => setIsMobileMenuOpen(true)}
-                    className="bg-slate-800/90 hover:bg-slate-700 text-white p-3 rounded-full border border-slate-500 shadow-xl active:scale-95 transition-all"
-                 >
-                     <Menu className="w-6 h-6" />
-                 </button>
-             </div>
+             {/* Mobile Menu Toggle - Visible on Mobile landscape or when forced */}
+             {showVirtualControls && (
+                 <div className="lg:hidden">
+                     <button 
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="bg-slate-800/90 hover:bg-slate-700 text-white p-3 rounded-full border border-slate-500 shadow-xl active:scale-95 transition-all"
+                     >
+                         <Menu className="w-6 h-6" />
+                     </button>
+                 </div>
+             )}
 
              <div className="bg-slate-900/90 text-white p-3 rounded-lg border-l-4 border-yellow-500 shadow-xl w-64 backdrop-blur-sm pointer-events-auto">
                 <div className="flex items-center gap-2 mb-1">
@@ -311,7 +316,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               <div className="flex justify-between items-center mb-8">
                   <h2 className="text-2xl font-black text-white">메뉴 (Menu)</h2>
                   <button 
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={handleCloseMenu}
                     className="p-2 bg-slate-800 rounded-full border border-slate-600 text-white"
                   >
                       <X size={24} />
@@ -319,28 +324,28 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               </div>
               
               <div className="grid grid-cols-2 gap-4 flex-1 overflow-y-auto">
-                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenShop(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-yellow-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button onClick={() => { handleCloseMenu(); onOpenShop(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-yellow-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <ShoppingBag size={40} className="text-yellow-400" />
                        <span className="text-white font-bold text-lg">상점 (Shop)</span>
                    </button>
-                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenSkills && onOpenSkills(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-green-500 rounded-xl p-6 gap-3 active:scale-95 transition-all relative">
+                   <button onClick={() => { handleCloseMenu(); onOpenSkills && onOpenSkills(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-green-500 rounded-xl p-6 gap-3 active:scale-95 transition-all relative">
                        <Zap size={40} className="text-green-400" />
                        <span className="text-white font-bold text-lg">스킬 (Skills)</span>
                        {player.sp > 0 && <span className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-ping"/>}
                    </button>
-                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenMap(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-blue-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button onClick={() => { handleCloseMenu(); onOpenMap(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-blue-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Map size={40} className="text-blue-400" />
                        <span className="text-white font-bold text-lg">지도 (Map)</span>
                    </button>
-                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenSettings && onOpenSettings(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-gray-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button onClick={() => { handleCloseMenu(); onOpenSettings && onOpenSettings(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-gray-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Settings size={40} className="text-gray-300" />
                        <span className="text-white font-bold text-lg">설정 (Settings)</span>
                    </button>
-                   <button onClick={() => { setIsMobileMenuOpen(false); onOpenImageEditor && onOpenImageEditor(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button onClick={() => { handleCloseMenu(); onOpenImageEditor && onOpenImageEditor(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Camera size={40} className="text-pink-400" />
                        <span className="text-white font-bold text-lg">AI 스튜디오</span>
                    </button>
-                   <button onClick={() => { setIsMobileMenuOpen(false); toggleFullScreen(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-purple-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button onClick={() => { handleCloseMenu(); toggleFullScreen(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-purple-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        {isFullscreen ? <Minimize2 size={40} className="text-purple-400"/> : <Maximize2 size={40} className="text-purple-400"/>}
                        <span className="text-white font-bold text-lg">전체화면</span>
                    </button>
@@ -348,74 +353,76 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
           </div>
       )}
 
-      {/* VIRTUAL CONTROLS FOR MOBILE */}
-      <div className="lg:hidden absolute bottom-0 left-0 w-full h-full pointer-events-none z-40">
-           {/* D-Pad (Left) */}
-           <div className="absolute bottom-8 left-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-left">
-                <div className="grid grid-cols-3 gap-1">
-                    <div />
-                    <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-14 h-14" />
-                    <div />
-                    <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} className="w-14 h-14" />
-                    <div className="w-14 h-14 bg-slate-800/30 rounded-full" />
-                    <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} className="w-14 h-14" />
-                    <div />
-                    <MobileButton code={keyBindings.DOWN} icon={ArrowDown} className="w-14 h-14" />
-                    <div />
-                </div>
-           </div>
-
-           {/* Action Buttons (Right) */}
-           <div className="absolute bottom-8 right-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-right">
-                <div className="relative w-48 h-48">
-                    {/* Main Actions */}
-                    <MobileButton 
-                        code={keyBindings.ATTACK} 
-                        icon={Sword} 
-                        className="absolute bottom-0 right-0 w-20 h-20 bg-red-800/60 border-red-400 rounded-full z-10" 
-                    />
-                    <MobileButton 
-                        code={keyBindings.JUMP} 
-                        icon={ChevronsUp} 
-                        className="absolute bottom-4 right-24 w-16 h-16 bg-blue-800/60 border-blue-400 rounded-full" 
-                    />
-
-                    {/* Magic Keys (Skills) - Arc placement */}
-                    <MobileButton 
-                        code={keyBindings.SKILL_1} 
-                        label="A"
-                        className="absolute top-12 right-24 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
-                    />
-                    <MobileButton 
-                        code={keyBindings.SKILL_2} 
-                        label="S"
-                        className="absolute top-4 right-16 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
-                    />
-                    <MobileButton 
-                        code={keyBindings.SKILL_3} 
-                        label="D"
-                        className="absolute top-0 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
-                    />
-                    <MobileButton 
-                        code={keyBindings.SKILL_4} 
-                        label="F"
-                        className="absolute -top-12 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
-                    />
-                </div>
-           </div>
-           
-           {/* Mobile Job Advance Alert */}
-           {canAdvance && (
-               <div className="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-auto">
-                    <button 
-                        onClick={onJobAdvance}
-                        className="bg-yellow-600 text-white text-xs font-bold px-4 py-2 rounded-full animate-bounce shadow-lg border border-yellow-300"
-                    >
-                        👑 전직하기
-                    </button>
+      {/* VIRTUAL CONTROLS FOR MOBILE (LANDSCAPE ONLY) */}
+      {showVirtualControls && (
+          <div className="lg:hidden absolute bottom-0 left-0 w-full h-full pointer-events-none z-40">
+               {/* D-Pad (Left) */}
+               <div className="absolute bottom-8 left-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-left">
+                    <div className="grid grid-cols-3 gap-1">
+                        <div />
+                        <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-14 h-14" />
+                        <div />
+                        <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} className="w-14 h-14" />
+                        <div className="w-14 h-14 bg-slate-800/30 rounded-full" />
+                        <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} className="w-14 h-14" />
+                        <div />
+                        <MobileButton code={keyBindings.DOWN} icon={ArrowDown} className="w-14 h-14" />
+                        <div />
+                    </div>
                </div>
-           )}
-      </div>
+
+               {/* Action Buttons (Right) */}
+               <div className="absolute bottom-8 right-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-right">
+                    <div className="relative w-48 h-48">
+                        {/* Main Actions */}
+                        <MobileButton 
+                            code={keyBindings.ATTACK} 
+                            icon={Sword} 
+                            className="absolute bottom-0 right-0 w-20 h-20 bg-red-800/60 border-red-400 rounded-full z-10" 
+                        />
+                        <MobileButton 
+                            code={keyBindings.JUMP} 
+                            icon={ChevronsUp} 
+                            className="absolute bottom-4 right-24 w-16 h-16 bg-blue-800/60 border-blue-400 rounded-full" 
+                        />
+
+                        {/* Magic Keys (Skills) - Arc placement */}
+                        <MobileButton 
+                            code={keyBindings.SKILL_1} 
+                            label="A"
+                            className="absolute top-12 right-24 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                        />
+                        <MobileButton 
+                            code={keyBindings.SKILL_2} 
+                            label="S"
+                            className="absolute top-4 right-16 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                        />
+                        <MobileButton 
+                            code={keyBindings.SKILL_3} 
+                            label="D"
+                            className="absolute top-0 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                        />
+                        <MobileButton 
+                            code={keyBindings.SKILL_4} 
+                            label="F"
+                            className="absolute -top-12 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                        />
+                    </div>
+               </div>
+               
+               {/* Mobile Job Advance Alert */}
+               {canAdvance && (
+                   <div className="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-auto">
+                        <button 
+                            onClick={onJobAdvance}
+                            className="bg-yellow-600 text-white text-xs font-bold px-4 py-2 rounded-full animate-bounce shadow-lg border border-yellow-300"
+                        >
+                            👑 전직하기
+                        </button>
+                   </div>
+               )}
+          </div>
+      )}
 
       {/* BOTTOM SECTION (HUD) */}
       <div className="flex justify-between items-end pointer-events-none">
@@ -533,23 +540,25 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               })}
           </div>
           
-          {/* Mobile Essential HUD (Potions only) - moved to top left corner on mobile to avoid overlap with controls */}
-          <div className="lg:hidden flex flex-col gap-2 pointer-events-auto p-4 absolute top-20 left-4 z-30">
-                <div 
-                    onClick={() => simulateKey(keyBindings.POTION_HP, 'keydown')}
-                    className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
-                >
-                    🍷
-                    <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-white/50">{player.hpPotions}</span>
-                </div>
-                <div 
-                    onClick={() => simulateKey(keyBindings.POTION_MP, 'keydown')}
-                    className="w-10 h-10 rounded-full border-2 border-blue-500 bg-blue-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
-                >
-                    🧪
-                    <span className="absolute -top-1 -right-1 bg-blue-600 text-[10px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-white/50">{player.mpPotions}</span>
-                </div>
-          </div>
+          {/* Mobile Essential HUD (Potions only) - VISIBLE ONLY IN LANDSCAPE (Portrait has its own controls) */}
+          {showVirtualControls && (
+              <div className="lg:hidden flex flex-col gap-2 pointer-events-auto p-4 absolute top-20 left-4 z-30">
+                    <div 
+                        onClick={() => simulateKey(keyBindings.POTION_HP, 'keydown')}
+                        className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
+                    >
+                        🍷
+                        <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-white/50">{player.hpPotions}</span>
+                    </div>
+                    <div 
+                        onClick={() => simulateKey(keyBindings.POTION_MP, 'keydown')}
+                        className="w-10 h-10 rounded-full border-2 border-blue-500 bg-blue-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
+                    >
+                        🧪
+                        <span className="absolute -top-1 -right-1 bg-blue-600 text-[10px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-white/50">{player.mpPotions}</span>
+                    </div>
+              </div>
+          )}
       </div>
     </div>
   );
