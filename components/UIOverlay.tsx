@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Player, Quest, Enemy, WeaponType, KeyBindings } from '../types';
+import { Player, Quest, Enemy, WeaponType, KeyBindings, MobileControlSettings } from '../types';
 import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Camera, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp, Maximize2, Minimize2, Menu, X, RotateCcw } from 'lucide-react';
-import { WEAPONS, SKILL_TREE, ADVANCED_CLASS_NAMES } from '../constants';
+import { WEAPONS, SKILL_TREE, ADVANCED_CLASS_NAMES, DEFAULT_MOBILE_SETTINGS } from '../constants';
 
 interface UIOverlayProps {
   player: Player;
@@ -24,16 +24,18 @@ interface UIOverlayProps {
   showVirtualControls?: boolean; // New prop to control visibility
   forceMenuOpen?: boolean;
   onCloseMenu?: () => void;
+  mobileSettings?: MobileControlSettings;
 }
 
 const UIOverlay: React.FC<UIOverlayProps> = ({ 
-  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onOpenImageEditor, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu
+  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onOpenImageEditor, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu, mobileSettings
 }) => {
   const hpPercent = (player.hp / player.maxHp) * 100;
   const mpPercent = (player.mp / player.maxMp) * 100;
   const expPercent = (player.exp / player.maxExp) * 100;
 
   const canAdvance = player.level >= 30 && !player.isAdvanced;
+  const settings = mobileSettings || DEFAULT_MOBILE_SETTINGS;
 
   // Full Screen State
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -366,57 +368,71 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
 
       {/* VIRTUAL CONTROLS FOR MOBILE (LANDSCAPE ONLY) */}
       {showVirtualControls && (
-          <div className="lg:hidden absolute bottom-0 left-0 w-full h-full pointer-events-none z-40">
-               {/* D-Pad (Left) */}
-               <div className="absolute bottom-8 left-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-left">
+          <div className="lg:hidden absolute bottom-0 left-0 w-full h-full pointer-events-none z-40" style={{ opacity: settings.opacity }}>
+               {/* D-Pad (Left) - Customizable Position */}
+               <div 
+                    className="absolute pointer-events-auto origin-bottom-left"
+                    style={{ 
+                        left: `${settings.dpadX}%`, 
+                        bottom: `${settings.dpadY}%`,
+                        transform: `scale(${settings.scale})`
+                    }}
+               >
                     <div className="grid grid-cols-3 gap-1">
                         <div />
-                        <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-14 h-14" />
+                        <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-16 h-16" />
                         <div />
-                        <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} className="w-14 h-14" />
-                        <div className="w-14 h-14 bg-slate-800/30 rounded-full" />
-                        <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} className="w-14 h-14" />
+                        <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} className="w-16 h-16" />
+                        <div className="w-16 h-16 bg-slate-800/30 rounded-full" />
+                        <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} className="w-16 h-16" />
                         <div />
-                        <MobileButton code={keyBindings.DOWN} icon={ArrowDown} className="w-14 h-14" />
+                        <MobileButton code={keyBindings.DOWN} icon={ArrowDown} className="w-16 h-16" />
                         <div />
                     </div>
                </div>
 
-               {/* Action Buttons (Right) */}
-               <div className="absolute bottom-8 right-6 pointer-events-auto scale-90 md:scale-100 origin-bottom-right">
-                    <div className="relative w-48 h-48">
-                        {/* Main Actions */}
+               {/* Action Buttons (Right) - Customizable Position */}
+               <div 
+                    className="absolute pointer-events-auto origin-bottom-right"
+                    style={{ 
+                        right: `${settings.actionX}%`, 
+                        bottom: `${settings.actionY}%`,
+                        transform: `scale(${settings.scale})`
+                    }}
+               >
+                    <div className="relative w-64 h-64">
+                        {/* Main Actions - Scaled Up */}
                         <MobileButton 
                             code={keyBindings.ATTACK} 
                             icon={Sword} 
-                            className="absolute bottom-0 right-0 w-20 h-20 bg-red-800/60 border-red-400 rounded-full z-10" 
+                            className="absolute bottom-0 right-0 w-24 h-24 bg-red-800/60 border-red-400 rounded-full z-10" 
                         />
                         <MobileButton 
                             code={keyBindings.JUMP} 
                             icon={ChevronsUp} 
-                            className="absolute bottom-4 right-24 w-16 h-16 bg-blue-800/60 border-blue-400 rounded-full" 
+                            className="absolute bottom-4 right-28 w-20 h-20 bg-blue-800/60 border-blue-400 rounded-full" 
                         />
 
-                        {/* Magic Keys (Skills) - Arc placement */}
+                        {/* Magic Keys (Skills) - Arc placement - Scaled Up */}
                         <MobileButton 
                             code={keyBindings.SKILL_1} 
                             label="A"
-                            className="absolute top-12 right-24 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                            className="absolute top-16 right-28 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
                         />
                         <MobileButton 
                             code={keyBindings.SKILL_2} 
                             label="S"
-                            className="absolute top-4 right-16 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                            className="absolute top-6 right-20 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
                         />
                         <MobileButton 
                             code={keyBindings.SKILL_3} 
                             label="D"
-                            className="absolute top-0 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                            className="absolute top-0 right-4 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
                         />
                         <MobileButton 
                             code={keyBindings.SKILL_4} 
                             label="F"
-                            className="absolute -top-12 right-4 w-10 h-10 bg-indigo-900/60 border-indigo-400 text-xs" 
+                            className="absolute -top-14 right-4 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
                         />
                     </div>
                </div>
@@ -553,7 +569,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
           
           {/* Mobile Essential HUD (Potions only) - VISIBLE ONLY IN LANDSCAPE (Portrait has its own controls) */}
           {showVirtualControls && (
-              <div className="lg:hidden flex flex-col gap-2 pointer-events-auto p-4 absolute top-20 left-4 z-30">
+              <div className="lg:hidden flex flex-col gap-2 pointer-events-auto p-4 absolute top-20 left-4 z-30" style={{ opacity: settings.opacity }}>
                     <div 
                         onClick={() => simulateKey(keyBindings.POTION_HP, 'keydown')}
                         className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
