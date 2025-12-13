@@ -7,13 +7,14 @@ import SkillTreeModal from './components/SkillTreeModal';
 import SettingsModal from './components/SettingsModal';
 import ImageEditorModal from './components/ImageEditorModal';
 import ClassSelectionModal from './components/ClassSelectionModal';
+import MobileControls from './components/MobileControls';
 import { Player, Quest, Enemy, WeaponType, KeyBindings, ClassType } from './types';
 import { generateQuest } from './services/geminiService';
 import { UPGRADE_COSTS, BIOMES, DEFAULT_KEY_BINDINGS, CLASS_INFOS, ADVANCED_CLASS_NAMES } from './constants';
 
 const App: React.FC = () => {
   const gameRef = useRef<GameCanvasHandle>(null);
-  const playerStatsRef = useRef<Player | null>(null); // Ref to hold latest stats
+  const playerStatsRef = useRef<Player | null>(null);
   const [playerStats, setPlayerStats] = useState<Player | null>(null);
   const [bossStats, setBossStats] = useState<Enemy | null>(null);
   const [currentQuest, setCurrentQuest] = useState<Quest | null>(null);
@@ -36,37 +37,42 @@ const App: React.FC = () => {
   const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
   
-  // Scaling State
+  // Layout State
   const [scale, setScale] = useState(1);
+  const [isPortrait, setIsPortrait] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Derived state for game loop
   const isPaused = isShopOpen || isMapOpen || isSkillsOpen || isSettingsOpen || isImageEditorOpen || isClassSelectionOpen;
   const gameActive = gameStarted && !isGameOver && !isPaused;
 
-  // Refs for tracking state inside effects without dependency loops
   const currentQuestRef = useRef<Quest | null>(null);
   const prevBiomeIndexRef = useRef<number>(0);
 
-  // Sync refs
   useEffect(() => { currentQuestRef.current = currentQuest; }, [currentQuest]);
 
-  // Handle Scaling
+  // Handle Scaling & Orientation
   useEffect(() => {
     const handleResize = () => {
-       const targetW = 1024;
-       const targetH = 600;
        const windowW = window.innerWidth;
        const windowH = window.innerHeight;
+       const portrait = windowH > windowW;
+       setIsPortrait(portrait);
+
+       const targetW = 1024;
        
-       // Calculate scale to fit window with some margin
-       const scaleX = windowW / targetW;
-       const scaleY = windowH / targetH;
-       
-       // Choose the smaller scale to ensure full fit
-       // Clamp max scale to 1.0 (optional, but good for pixel art sharpness if not using pixelated render)
-       // We allow < 1 for mobile.
-       const newScale = Math.min(scaleX, scaleY);
-       setScale(newScale * 0.98); // 98% to prevent scrollbars from rounding errors
+       if (portrait) {
+           // In portrait, we fit the width of the screen
+           const newScale = windowW / targetW;
+           setScale(newScale);
+       } else {
+           // In landscape, we try to fit the whole 1024x600 in the center
+           const targetH = 600;
+           const scaleX = windowW / targetW;
+           const scaleY = windowH / targetH;
+           const newScale = Math.min(scaleX, scaleY);
+           setScale(newScale * 0.98); 
+       }
     };
 
     window.addEventListener('resize', handleResize);
@@ -97,7 +103,6 @@ const App: React.FC = () => {
   };
 
   const handleStatsUpdate = useCallback((player: Player, boss: Enemy | null, stageLevel: number, biomeName: string) => {
-    // Dynamically update name if advanced
     if (player.isAdvanced && ADVANCED_CLASS_NAMES[player.classType]) {
         player.name = ADVANCED_CLASS_NAMES[player.classType];
     }
@@ -120,7 +125,7 @@ const App: React.FC = () => {
       setIsGameOver(false);
       setGameLogs([]);
       setCurrentQuest(null);
-      setIsClassSelectionOpen(true); // Go back to class selection
+      setIsClassSelectionOpen(true);
       setGameStarted(false);
   }, []);
 
@@ -158,7 +163,6 @@ const App: React.FC = () => {
       setTimeout(() => {
           if (!isGameOver) handleGenerateQuest();
       }, 3000);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver]); 
 
   // Modal Handlers
@@ -171,9 +175,7 @@ const App: React.FC = () => {
   const handleOpenSettings = () => setIsSettingsOpen(true);
   const handleCloseSettings = () => setIsSettingsOpen(false);
   
-  const handleOpenImageEditor = () => {
-    setIsImageEditorOpen(true);
-  };
+  const handleOpenImageEditor = () => { setIsImageEditorOpen(true); };
   const handleCloseImageEditor = () => setIsImageEditorOpen(false);
   const handleApplyBackground = (imageUrl: string) => {
       setCustomBackground(imageUrl);
@@ -183,56 +185,38 @@ const App: React.FC = () => {
 
   const handlePurchase = (type: 'POTION_HP' | 'POTION_MP' | 'UPGRADE_ATK' | 'UPGRADE_HP' | 'UPGRADE_MP') => {
       if (!gameRef.current || !playerStats) return;
-
       let success = false;
-      
       if (type === 'POTION_HP') success = gameRef.current.purchasePotion('HP');
       if (type === 'POTION_MP') success = gameRef.current.purchasePotion('MP');
-      
       if (type.startsWith('UPGRADE_')) {
           let cost = 0;
           if (type === 'UPGRADE_ATK') cost = Math.floor(UPGRADE_COSTS.ATK.base * Math.pow(UPGRADE_COSTS.ATK.scale, Math.floor((playerStats.attack - 10) / 5)));
           if (type === 'UPGRADE_HP') cost = Math.floor(UPGRADE_COSTS.HP.base * Math.pow(UPGRADE_COSTS.HP.scale, Math.floor((playerStats.maxHp - 100) / 50)));
           if (type === 'UPGRADE_MP') cost = Math.floor(UPGRADE_COSTS.MP.base * Math.pow(UPGRADE_COSTS.MP.scale, Math.floor((playerStats.maxMp - 100) / 30)));
-          
           success = gameRef.current.upgradeStat(type.replace('UPGRADE_', '') as any, cost);
       }
-
-      if (success) {
-          addLog("구매 성공!");
-      } else {
-          addLog("골드가 부족합니다.");
-      }
+      if (success) addLog("구매 성공!"); else addLog("골드가 부족합니다.");
   };
 
   const handleSwitchWeapon = useCallback((weapon: WeaponType) => {
-    if (gameRef.current) {
-        gameRef.current.switchWeapon(weapon);
-    }
+    if (gameRef.current) gameRef.current.switchWeapon(weapon);
   }, []);
 
   const handleUpgradeSkill = (skillId: string) => {
-      if (gameRef.current) {
-          gameRef.current.upgradeSkill(skillId);
-      }
+      if (gameRef.current) gameRef.current.upgradeSkill(skillId);
   };
 
   const handleAssignSkillSlot = (skillId: string, slotKey: string) => {
       if (gameRef.current) {
           const result = gameRef.current.assignSkillSlot(skillId, slotKey);
           const keyName = slotKey.replace('Digit','').replace('SKILL_', '');
-          if (result === 'removed') {
-              addLog(`단축키 [${keyName}] 해제되었습니다.`);
-          } else {
-              addLog(`단축키 [${keyName}] 등록 완료!`);
-          }
+          if (result === 'removed') addLog(`단축키 [${keyName}] 해제되었습니다.`);
+          else addLog(`단축키 [${keyName}] 등록 완료!`);
       }
   };
 
   const handleJobAdvance = useCallback(() => {
-      if (gameRef.current) {
-          gameRef.current.jobAdvance();
-      }
+      if (gameRef.current) gameRef.current.jobAdvance();
   }, []);
 
   const handleUnlockAll = useCallback(() => {
@@ -243,41 +227,32 @@ const App: React.FC = () => {
       }
   }, []);
 
-  // Global Key Bindings for Opening Menus
+  // Global Key Bindings
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if (!gameStarted) return;
-          
           if (!isSettingsOpen && !isImageEditorOpen) {
               if (e.code === keyBindings.MENU_SHOP) setIsShopOpen(prev => !prev);
               if (e.code === keyBindings.MENU_MAP) setIsMapOpen(prev => !prev);
               if (e.code === keyBindings.MENU_SKILL) setIsSkillsOpen(prev => !prev);
           }
-
           if (e.code === 'Escape') {
-              setIsShopOpen(false);
-              setIsMapOpen(false);
-              setIsSkillsOpen(false);
-              setIsSettingsOpen(false);
-              setIsImageEditorOpen(false);
+              setIsShopOpen(false); setIsMapOpen(false); setIsSkillsOpen(false);
+              setIsSettingsOpen(false); setIsImageEditorOpen(false);
           }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameStarted, isSettingsOpen, isImageEditorOpen, keyBindings]);
   
-  // Initial startup quest
   useEffect(() => {
     if (gameStarted && !currentQuest && playerStats && playerStats.level === 1 && !loadingQuest) {
        handleGenerateQuest();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameStarted, playerStats]); 
 
-  // --- Biome Change Detection ---
   useEffect(() => {
     if (!gameStarted) return;
-
     const currentStageLevel = stageInfo.level;
     let newBiomeIndex = BIOMES.findIndex(b => currentStageLevel >= b.startStage && currentStageLevel <= b.endStage);
     if (newBiomeIndex === -1) newBiomeIndex = BIOMES.length - 1;
@@ -295,16 +270,27 @@ const App: React.FC = () => {
     }
   }, [stageInfo.level, gameStarted, customBackground]);
 
+  // Pass-through for mobile controls
+  const handleSimulateKey = (code: string, type: 'keydown' | 'keyup') => {
+      window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black overflow-hidden select-none">
+    <div className={`flex items-center justify-center bg-black overflow-hidden select-none ${isPortrait ? 'flex-col h-[100dvh]' : 'min-h-screen'}`}>
         
-      {/* Game Wrapper with Scaling */}
+      {/* 
+         GAME CONTAINER 
+         - In Portrait: Takes top part of screen, width fits screen, height based on aspect ratio
+         - In Landscape: Centered, scaled box
+      */}
       <div 
-        className="relative shadow-2xl overflow-hidden bg-slate-800 transition-transform duration-200 origin-center"
+        className={`relative shadow-2xl bg-slate-800 overflow-hidden flex-shrink-0 transition-transform duration-0 ${isPortrait ? 'origin-top-left' : 'origin-center'}`}
         style={{ 
             width: 1024, 
             height: 600,
-            transform: `scale(${scale})`
+            transform: `scale(${scale})`,
+            marginBottom: isPortrait ? `-${600 - (600 * scale)}px` : 0, // Remove empty space caused by scale only in portrait
+            marginRight: isPortrait ? `-${1024 - (1024 * scale)}px` : 0 
         }}
       >
         <GameCanvas 
@@ -339,53 +325,19 @@ const App: React.FC = () => {
             biomeName={stageInfo.name}
             keyBindings={keyBindings}
             onJobAdvance={handleJobAdvance}
+            showVirtualControls={!isPortrait} // Hide overlay controls in portrait
+            forceMenuOpen={mobileMenuOpen}
+            onCloseMenu={() => setMobileMenuOpen(false)}
           />
         )}
 
-        {/* Render Class Selection on top of game canvas logic */}
-        {isClassSelectionOpen && (
-           <div className="absolute inset-0 z-50">
-               <ClassSelectionModal onSelectClass={handleClassSelect} />
-           </div>
-        )}
-
-        {isShopOpen && playerStats && (
-            <ShopModal 
-                player={playerStats} 
-                onClose={handleCloseShop} 
-                onPurchase={handlePurchase} 
-            />
-        )}
-        {isMapOpen && playerStats && (
-            <WorldMap 
-                currentStage={stageInfo.level}
-                maxStageReached={playerStats.maxStageReached}
-                onClose={handleCloseMap}
-            />
-        )}
-        {isSkillsOpen && playerStats && (
-            <SkillTreeModal 
-                player={playerStats}
-                onClose={handleCloseSkills}
-                onUpgrade={handleUpgradeSkill}
-                onAssignSlot={handleAssignSkillSlot}
-                keyBindings={keyBindings}
-            />
-        )}
-        {isSettingsOpen && (
-            <SettingsModal
-                bindings={keyBindings}
-                onSave={setKeyBindings}
-                onClose={handleCloseSettings}
-                onUnlockAll={handleUnlockAll}
-            />
-        )}
-        {isImageEditorOpen && (
-            <ImageEditorModal
-                onClose={handleCloseImageEditor}
-                onApplyBackground={handleApplyBackground}
-            />
-        )}
+        {/* Modals placed inside the scaled area to keep theme consistency */}
+        {isClassSelectionOpen && <div className="absolute inset-0 z-50"><ClassSelectionModal onSelectClass={handleClassSelect} /></div>}
+        {isShopOpen && playerStats && <ShopModal player={playerStats} onClose={handleCloseShop} onPurchase={handlePurchase} />}
+        {isMapOpen && playerStats && <WorldMap currentStage={stageInfo.level} maxStageReached={playerStats.maxStageReached} onClose={handleCloseMap} />}
+        {isSkillsOpen && playerStats && <SkillTreeModal player={playerStats} onClose={handleCloseSkills} onUpgrade={handleUpgradeSkill} onAssignSlot={handleAssignSkillSlot} keyBindings={keyBindings} />}
+        {isSettingsOpen && <SettingsModal bindings={keyBindings} onSave={setKeyBindings} onClose={handleCloseSettings} onUnlockAll={handleUnlockAll} />}
+        {isImageEditorOpen && <ImageEditorModal onClose={handleCloseImageEditor} onApplyBackground={handleApplyBackground} />}
         
         {isPaused && !isGameOver && !isClassSelectionOpen && (
             <div className="absolute top-4 right-4 bg-yellow-500 text-black font-bold px-3 py-1 rounded shadow animate-pulse pointer-events-none z-40">
@@ -393,6 +345,18 @@ const App: React.FC = () => {
             </div>
         )}
       </div>
+
+      {/* PORTRAIT MOBILE CONTROLS (Bottom Half) */}
+      {isPortrait && playerStats && (
+          <div className="flex-1 w-full bg-slate-900 z-10 relative">
+              <MobileControls 
+                  keyBindings={keyBindings} 
+                  onSimulateKey={handleSimulateKey} 
+                  player={playerStats}
+                  onOpenMenu={() => setMobileMenuOpen(true)}
+              />
+          </div>
+      )}
     </div>
   );
 };
