@@ -1,0 +1,5 @@
+{
+  "name": "메이플 AI 어드벤처",
+  "description": "생성형 AI가 퀘스트와 스토리를 만들어주는 메이플스토리 스타일의 2D 횡스크롤 RPG 게임입니다. 몬스터를 사냥하고 레벨업하며 모험을 즐기세요.",
+  "requestFramePermissions": []
+}
