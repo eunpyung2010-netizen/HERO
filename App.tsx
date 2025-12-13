@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [isClassSelectionOpen, setIsClassSelectionOpen] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [gameResetKey, setGameResetKey] = useState(0); // Key to force re-mount on restart
   
   // Modals / Pause State
   const [isShopOpen, setIsShopOpen] = useState(false);
@@ -127,8 +128,10 @@ const App: React.FC = () => {
       setIsGameOver(false);
       setGameLogs([]);
       setCurrentQuest(null);
-      setIsClassSelectionOpen(true);
       setGameStarted(false);
+      setPlayerStats(null); // Clear player stats
+      setGameResetKey(prev => prev + 1); // Force GameCanvas Re-mount
+      setIsClassSelectionOpen(true);
   }, []);
 
   const handleQuestUpdate = useCallback((newCount: number) => {
@@ -302,6 +305,7 @@ const App: React.FC = () => {
         }}
       >
         <GameCanvas 
+          key={gameResetKey} // Force Re-mount on restart
           ref={gameRef}
           onStatsUpdate={handleStatsUpdate} 
           onEventLog={addLog}
