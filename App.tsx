@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import GameCanvas, { GameCanvasHandle } from './components/GameCanvas';
 import UIOverlay from './components/UIOverlay';
@@ -281,7 +282,7 @@ const App: React.FC = () => {
   };
 
   return (
-    // Use 100dvh for reliable mobile height
+    // Use 100dvh for reliable mobile height, ensure background covers everything
     <div className="w-full h-[100dvh] bg-black overflow-hidden select-none flex flex-col relative touch-none">
         
       {/* 
@@ -361,7 +362,7 @@ const App: React.FC = () => {
 
       {/* PORTRAIT MOBILE CONTROLS (Bottom Half) */}
       {isPortrait && playerStats && (
-          <div className="flex-1 w-full bg-slate-900 z-10 relative">
+          <div className="flex-1 w-full bg-slate-900 z-10 relative pb-safe">
               <MobileControls 
                   keyBindings={keyBindings} 
                   onSimulateKey={handleSimulateKey} 

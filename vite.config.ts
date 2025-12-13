@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // base: './', // Removed to use default absolute path '/' which is more stable for root deployments
   define: {
     // Vercel injects VITE_ prefixed variables during build.
     // We map them to process.env.API_KEY so the existing code structure works without modification.
