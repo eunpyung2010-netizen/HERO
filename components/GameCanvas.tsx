@@ -559,8 +559,8 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 id: Math.random().toString(),
                 x: player.x + (player.isDownAttacking ? player.width/2 - 10 : (player.direction === 1 ? player.width : 0)),
                 y: player.y + (player.isDownAttacking ? player.height : 30),
-                width: isExplosive ? 30 : 20, 
-                height: isExplosive ? 30 : 10,
+                width: isExplosive ? 40 : 30, // Increased size
+                height: isExplosive ? 40 : 30,
                 vx: vx,
                 vy: vy,
                 damage: player.attack * weapon.damageMult,
@@ -837,7 +837,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 const emoji = skillId === 'FireShot' ? 'üî•' : skillId === 'IceShot' ? '‚ùÑÔ∏è' : 'üèπ';
                 state.projectiles.push({
                     id: Math.random().toString(),
-                    x: player.x, y: player.y + 30, width: 30, height: 10,
+                    x: player.x, y: player.y + 30, width: 40, height: 20, // Increased size
                     vx: player.direction * 18, vy: 0,
                     damage: baseDamage, color: 'white', emoji: emoji,
                     life: 60, isDead: false, isMagic: true, rotation: player.direction===1?0:180,
@@ -852,7 +852,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                     setTimeout(() => {
                         state.projectiles.push({
                             id: Math.random().toString(),
-                            x: player.x, y: player.y + 30, width: 20, height: 10,
+                            x: player.x, y: player.y + 30, width: 30, height: 15, // Increased size
                             vx: player.direction * 18, vy: skillId==='Strafe' ? (Math.random()-0.5)*2 : (i-1)*2,
                             damage: baseDamage, color: 'green', emoji: '‚ûπ',
                             life: 60, isDead: false, isMagic: true, rotation: (player.direction===1?0:180) + (skillId==='Strafe'?0:(i-1)*15)
@@ -867,7 +867,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 // Fire arrow
                 state.projectiles.push({
                     id: Math.random().toString(),
-                    x: player.x, y: player.y + 30, width: 30, height: 10,
+                    x: player.x, y: player.y + 30, width: 40, height: 15, // Increased size
                     vx: player.direction * 18, vy: 0,
                     damage: baseDamage, color: 'white', emoji: 'üèπ',
                     life: 60, isDead: false, isMagic: true, rotation: player.direction===1?0:180,
@@ -911,8 +911,8 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                         state.projectiles.push({
                             id: Math.random().toString(),
                             x: player.x + player.direction * 30, y: player.y + 30,
-                            width: 15, height: 10, vx: player.direction * 25, vy: (Math.random()-0.5),
-                            damage: baseDamage, color: 'orange', emoji: '‚Ä¢', life: 40, isDead: false, isMagic: true, rotation: player.direction===1?0:180
+                            width: 25, height: 25, vx: player.direction * 25, vy: (Math.random()-0.5), // Increased Size
+                            damage: baseDamage, color: 'orange', emoji: 'üî¥', life: 40, isDead: false, isMagic: true, rotation: player.direction===1?0:180
                         });
                         SoundService.playAttack();
                     }, i * 60);
@@ -1497,7 +1497,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
             }
             if (enemy.stunTimer > 0) {
                 enemy.stunTimer--;
-                if(Math.random() < 0.1) createParticle(enemy.x, enemy.y, "Ì†ΩÌ≤´", "yellow", 20);
+                if(Math.random() < 0.1) createParticle(enemy.x, enemy.y, "üí´", "yellow", 20);
                 return;
             }
 
@@ -2009,7 +2009,11 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
             if (p.rotation) ctx.rotate(p.rotation * Math.PI / 180);
             
-            ctx.font = `${Math.max(20, p.width)}px serif`;
+            // INCREASE FONT SIZE LOGIC
+            // Ensure font is at least 30px or matches width, to make emojis visible
+            const baseSize = Math.max(30, p.width);
+            ctx.font = `${baseSize}px serif`;
+            
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(p.emoji, 0, 0);
@@ -2022,7 +2026,7 @@ const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                     ctx.globalAlpha = t.alpha;
                     ctx.fillStyle = p.color;
                     ctx.beginPath();
-                    ctx.arc(t.x, t.y, 3, 0, Math.PI*2);
+                    ctx.arc(t.x, t.y, 4, 0, Math.PI*2); // Slightly larger trail
                     ctx.fill();
                 });
                 ctx.globalAlpha = 1.0;

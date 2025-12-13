@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Player, Quest, Enemy, WeaponType, KeyBindings } from '../types';
-import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Camera, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp, Maximize2, Minimize2, Menu, X } from 'lucide-react';
+import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Camera, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp, Maximize2, Minimize2, Menu, X, RotateCcw } from 'lucide-react';
 import { WEAPONS, SKILL_TREE, ADVANCED_CLASS_NAMES } from '../constants';
 
 interface UIOverlayProps {
@@ -211,6 +211,13 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
              {/* Desktop Menu - Hidden on Mobile */}
              <div className="hidden lg:flex gap-2">
                  <button 
+                    onClick={onRestart}
+                    className="bg-red-900/80 hover:bg-red-800 text-white p-2 rounded-lg border border-red-700 shadow-lg active:scale-95 transition-all group"
+                    title="새로 시작"
+                 >
+                     <RotateCcw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500"/>
+                 </button>
+                 <button 
                     onClick={toggleFullScreen}
                     className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg border border-slate-600 shadow-lg active:scale-95 transition-all group"
                     title="전체화면"
@@ -324,28 +331,32 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               </div>
               
               <div className="grid grid-cols-2 gap-4 flex-1 overflow-y-auto">
-                   <button onClick={() => { handleCloseMenu(); onOpenShop(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-yellow-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button type="button" onClick={() => { handleCloseMenu(); onOpenShop(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-yellow-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <ShoppingBag size={40} className="text-yellow-400" />
                        <span className="text-white font-bold text-lg">상점 (Shop)</span>
                    </button>
-                   <button onClick={() => { handleCloseMenu(); onOpenSkills && onOpenSkills(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-green-500 rounded-xl p-6 gap-3 active:scale-95 transition-all relative">
+                   <button type="button" onClick={() => { handleCloseMenu(); onOpenSkills && onOpenSkills(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-green-500 rounded-xl p-6 gap-3 active:scale-95 transition-all relative">
                        <Zap size={40} className="text-green-400" />
                        <span className="text-white font-bold text-lg">스킬 (Skills)</span>
                        {player.sp > 0 && <span className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-ping"/>}
                    </button>
-                   <button onClick={() => { handleCloseMenu(); onOpenMap(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-blue-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button type="button" onClick={() => { handleCloseMenu(); onOpenMap(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-blue-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Map size={40} className="text-blue-400" />
                        <span className="text-white font-bold text-lg">지도 (Map)</span>
                    </button>
-                   <button onClick={() => { handleCloseMenu(); onOpenSettings && onOpenSettings(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-gray-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button type="button" onClick={() => { handleCloseMenu(); onOpenSettings && onOpenSettings(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-gray-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Settings size={40} className="text-gray-300" />
                        <span className="text-white font-bold text-lg">설정 (Settings)</span>
                    </button>
-                   <button onClick={() => { handleCloseMenu(); onOpenImageEditor && onOpenImageEditor(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button type="button" onClick={() => { handleCloseMenu(); onOpenImageEditor && onOpenImageEditor(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Camera size={40} className="text-pink-400" />
                        <span className="text-white font-bold text-lg">AI 스튜디오</span>
                    </button>
-                   <button onClick={() => { handleCloseMenu(); toggleFullScreen(); }} className="flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-purple-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                   <button type="button" onClick={() => { handleCloseMenu(); onRestart(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-red-900/30 border-2 border-red-700 hover:border-red-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
+                       <RotateCcw size={40} className="text-red-400"/>
+                       <span className="text-white font-bold text-lg">새로 시작</span>
+                   </button>
+                   <button type="button" onClick={() => { handleCloseMenu(); toggleFullScreen(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-purple-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        {isFullscreen ? <Minimize2 size={40} className="text-purple-400"/> : <Maximize2 size={40} className="text-purple-400"/>}
                        <span className="text-white font-bold text-lg">전체화면</span>
                    </button>
