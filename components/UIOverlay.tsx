@@ -87,15 +87,23 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               e.stopPropagation();
               simulateKey(code, 'keyup');
           }}
-          onContextMenu={(e) => e.preventDefault()}
+          onPointerCancel={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              simulateKey(code, 'keyup');
+          }}
+          onContextMenu={(e) => {
+              e.preventDefault();
+              simulateKey(code, 'keyup');
+          }}
       >
-          {Icon ? <Icon className="text-white/90" size={24} /> : <span className="text-white font-bold">{label}</span>}
+          {Icon ? <Icon className="text-white/90" size={32} /> : <span className="text-white font-bold text-xl">{label}</span>}
       </button>
   );
 
   if (player.isDead) {
       return (
-          <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black/80 z-50 backdrop-blur-sm">
+          <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black/80 z-50 backdrop-blur-sm pointer-events-auto">
               <div className="text-center p-8 bg-slate-900 border-2 border-red-800 rounded-xl shadow-2xl">
                   <Skull className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
                   <h2 className="text-4xl font-black text-white mb-2 tracking-widest uppercase">Game Over</h2>
@@ -271,17 +279,17 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
              
              {/* Mobile Menu Toggle - Visible on Mobile landscape or when forced */}
              {showVirtualControls && (
-                 <div className="lg:hidden">
+                 <div className="lg:hidden pointer-events-auto">
                      <button 
                         onClick={() => setIsMobileMenuOpen(true)}
-                        className="bg-slate-800/90 hover:bg-slate-700 text-white p-3 rounded-full border border-slate-500 shadow-xl active:scale-95 transition-all"
+                        className="bg-slate-800/90 hover:bg-slate-700 text-white p-3 rounded-full border border-slate-500 shadow-xl active:scale-95 transition-all fixed top-4 right-4 z-50"
                      >
                          <Menu className="w-6 h-6" />
                      </button>
                  </div>
              )}
 
-             <div className="bg-slate-900/90 text-white p-3 rounded-lg border-l-4 border-yellow-500 shadow-xl w-64 backdrop-blur-sm pointer-events-auto">
+             <div className="hidden lg:flex bg-slate-900/90 text-white p-3 rounded-lg border-l-4 border-yellow-500 shadow-xl w-64 backdrop-blur-sm pointer-events-auto flex-col">
                 <div className="flex items-center gap-2 mb-1">
                     <Star className="w-3 h-3 text-yellow-500 fill-current" />
                     <h3 className="font-bold text-sm text-yellow-100 truncate">
@@ -321,7 +329,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
 
       {/* MOBILE MENU OVERLAY */}
       {isMobileMenuOpen && (
-          <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-lg p-6 flex flex-col pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+          <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-lg p-6 flex flex-col pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
               <div className="flex justify-between items-center mb-8">
                   <h2 className="text-2xl font-black text-white">메뉴 (Menu)</h2>
                   <button 
@@ -367,8 +375,9 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
       )}
 
       {/* VIRTUAL CONTROLS FOR MOBILE (LANDSCAPE ONLY) */}
+      {/* Changed to fixed positioning to allow placement anywhere on screen independent of game canvas */}
       {showVirtualControls && (
-          <div className="lg:hidden absolute bottom-0 left-0 w-full h-full pointer-events-none z-40" style={{ opacity: settings.opacity }}>
+          <div className="lg:hidden fixed inset-0 pointer-events-none z-40" style={{ opacity: settings.opacity }}>
                {/* D-Pad (Left) - Customizable Position */}
                <div 
                     className="absolute pointer-events-auto origin-bottom-left"
@@ -380,13 +389,13 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                >
                     <div className="grid grid-cols-3 gap-1">
                         <div />
-                        <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-16 h-16" />
+                        <MobileButton code={keyBindings.UP} icon={ArrowUp} className="w-20 h-20" />
                         <div />
-                        <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} className="w-16 h-16" />
-                        <div className="w-16 h-16 bg-slate-800/30 rounded-full" />
-                        <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} className="w-16 h-16" />
+                        <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} className="w-20 h-20" />
+                        <div className="w-20 h-20 bg-slate-800/30 rounded-full" />
+                        <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} className="w-20 h-20" />
                         <div />
-                        <MobileButton code={keyBindings.DOWN} icon={ArrowDown} className="w-16 h-16" />
+                        <MobileButton code={keyBindings.DOWN} icon={ArrowDown} className="w-20 h-20" />
                         <div />
                     </div>
                </div>
@@ -400,39 +409,39 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                         transform: `scale(${settings.scale})`
                     }}
                >
-                    <div className="relative w-64 h-64">
-                        {/* Main Actions - Scaled Up */}
+                    <div className="relative w-80 h-80">
+                        {/* Main Actions - Scaled Up Significantly */}
                         <MobileButton 
                             code={keyBindings.ATTACK} 
                             icon={Sword} 
-                            className="absolute bottom-0 right-0 w-24 h-24 bg-red-800/60 border-red-400 rounded-full z-10" 
+                            className="absolute bottom-0 right-0 w-32 h-32 bg-red-800/60 border-red-400 rounded-full z-10" 
                         />
                         <MobileButton 
                             code={keyBindings.JUMP} 
                             icon={ChevronsUp} 
-                            className="absolute bottom-4 right-28 w-20 h-20 bg-blue-800/60 border-blue-400 rounded-full" 
+                            className="absolute bottom-4 right-36 w-24 h-24 bg-blue-800/60 border-blue-400 rounded-full" 
                         />
 
                         {/* Magic Keys (Skills) - Arc placement - Scaled Up */}
                         <MobileButton 
                             code={keyBindings.SKILL_1} 
                             label="A"
-                            className="absolute top-16 right-28 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
+                            className="absolute top-20 right-40 w-14 h-14 bg-indigo-900/60 border-indigo-400 text-base" 
                         />
                         <MobileButton 
                             code={keyBindings.SKILL_2} 
                             label="S"
-                            className="absolute top-6 right-20 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
+                            className="absolute top-8 right-28 w-14 h-14 bg-indigo-900/60 border-indigo-400 text-base" 
                         />
                         <MobileButton 
                             code={keyBindings.SKILL_3} 
                             label="D"
-                            className="absolute top-0 right-4 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
+                            className="absolute top-0 right-6 w-14 h-14 bg-indigo-900/60 border-indigo-400 text-base" 
                         />
                         <MobileButton 
                             code={keyBindings.SKILL_4} 
                             label="F"
-                            className="absolute -top-14 right-4 w-12 h-12 bg-indigo-900/60 border-indigo-400 text-sm" 
+                            className="absolute -top-16 right-4 w-14 h-14 bg-indigo-900/60 border-indigo-400 text-base" 
                         />
                     </div>
                </div>
@@ -453,8 +462,8 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
 
       {/* BOTTOM SECTION (HUD) */}
       <div className="flex justify-between items-end pointer-events-none">
-          {/* Logs */}
-          <div className="w-48 md:w-96 h-24 md:h-40 overflow-hidden flex flex-col justify-end pointer-events-auto mask-image-gradient p-4 mb-20 lg:mb-0">
+          {/* Logs - Hidden on Mobile Landscape to prevent overlap */}
+          <div className="hidden lg:flex w-48 md:w-96 h-24 md:h-40 overflow-hidden flex-col justify-end pointer-events-auto mask-image-gradient p-4 mb-0">
               <div className="space-y-1">
                   {logs.slice(0, 5).map((log, i) => (
                       <div key={i} className="text-xs text-white/90 drop-shadow-md bg-black/40 px-2 py-0.5 rounded w-fit animate-in fade-in slide-in-from-left-2">
@@ -572,17 +581,17 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
               <div className="lg:hidden flex flex-col gap-2 pointer-events-auto p-4 absolute top-20 left-4 z-30" style={{ opacity: settings.opacity }}>
                     <div 
                         onClick={() => simulateKey(keyBindings.POTION_HP, 'keydown')}
-                        className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
+                        className="w-12 h-12 rounded-full border-2 border-red-500 bg-red-900/80 flex items-center justify-center text-xl shadow-lg active:scale-95 cursor-pointer relative"
                     >
                         🍷
-                        <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-white/50">{player.hpPotions}</span>
+                        <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] w-5 h-5 rounded-full flex items-center justify-center text-white border border-white/50">{player.hpPotions}</span>
                     </div>
                     <div 
                         onClick={() => simulateKey(keyBindings.POTION_MP, 'keydown')}
-                        className="w-10 h-10 rounded-full border-2 border-blue-500 bg-blue-900/80 flex items-center justify-center text-lg shadow-lg active:scale-95 cursor-pointer relative"
+                        className="w-12 h-12 rounded-full border-2 border-blue-500 bg-blue-900/80 flex items-center justify-center text-xl shadow-lg active:scale-95 cursor-pointer relative"
                     >
                         🧪
-                        <span className="absolute -top-1 -right-1 bg-blue-600 text-[10px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-white/50">{player.mpPotions}</span>
+                        <span className="absolute -top-1 -right-1 bg-blue-600 text-[10px] w-5 h-5 rounded-full flex items-center justify-center text-white border border-white/50">{player.mpPotions}</span>
                     </div>
               </div>
           )}
