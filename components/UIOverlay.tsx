@@ -22,7 +22,7 @@ interface UIOverlayProps {
   stageLevel: number;
   biomeName: string;
   keyBindings: KeyBindings;
-  showVirtualControls?: boolean; // New prop to control visibility
+  showVirtualControls?: boolean; 
   forceMenuOpen?: boolean;
   onCloseMenu?: () => void;
   mobileSettings?: MobileControlSettings;
@@ -38,16 +38,12 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
   const canAdvance = player.level >= 30 && !player.isAdvanced;
   const settings = mobileSettings || DEFAULT_MOBILE_SETTINGS;
 
-  // Full Screen State
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-      if (forceMenuOpen) setIsMobileMenuOpen(true);
-  }, [forceMenuOpen]);
+  // Use the prop provided by App.tsx as the source of truth for the menu
+  const isMobileMenuOpen = forceMenuOpen || false;
 
   const handleCloseMenu = () => {
-      setIsMobileMenuOpen(false);
       if (onCloseMenu) onCloseMenu();
   };
 
@@ -198,6 +194,14 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                        {player.mp} / {player.maxMp}
                     </div>
                  </div>
+
+                 {/* EXP BAR RESTORED */}
+                 <div className="relative h-2 md:h-2.5 bg-slate-900/90 rounded-sm border border-slate-600 mt-0.5 overflow-hidden shadow-inner group" title={`EXP: ${player.exp} / ${player.maxExp}`}>
+                    <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-200 transition-all duration-300" style={{ width: `${Math.min(100, expPercent)}%` }} />
+                    <div className="absolute inset-0 flex items-center justify-center text-[7px] md:text-[8px] font-black text-black/70 z-10 tracking-widest">
+                       EXP {(expPercent).toFixed(1)}%
+                    </div>
+                 </div>
              </div>
         </div>
 
@@ -284,8 +288,13 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
              {showVirtualControls && (
                  <div className="lg:hidden pointer-events-auto">
                      <button 
-                        onPointerDown={(e) => { e.preventDefault(); setIsMobileMenuOpen(true); }}
+                        onPointerDown={(e) => { 
+                            e.preventDefault(); 
+                            e.stopPropagation();
+                            if (onCloseMenu) onCloseMenu(); // This toggles it in parent
+                        }}
                         className="bg-slate-800/80 hover:bg-slate-700 text-white p-2.5 rounded-full border border-slate-500/50 shadow-xl active:scale-95 transition-all fixed top-4 right-4 z-50 touch-none backdrop-blur-sm"
+                        style={{ pointerEvents: 'auto' }}
                      >
                          <Menu className="w-6 h-6" />
                      </button>
