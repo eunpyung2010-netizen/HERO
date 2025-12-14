@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { KeyBindings, MobileControlSettings } from '../types';
-import { X, Keyboard, RotateCcw, Key, Smartphone, QrCode, Move, Sliders } from 'lucide-react';
+import { X, Keyboard, RotateCcw, Key, Move, Sliders, QrCode } from 'lucide-react';
 import { DEFAULT_KEY_BINDINGS, DEFAULT_MOBILE_SETTINGS } from '../constants';
 
 interface SettingsModalProps {
@@ -17,7 +18,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ bindings, onSave, mobileS
     const [currentMobileSettings, setCurrentMobileSettings] = useState<MobileControlSettings>(mobileSettings || DEFAULT_MOBILE_SETTINGS);
     const [listeningKey, setListeningKey] = useState<keyof KeyBindings | null>(null);
     const [activeTab, setActiveTab] = useState<'keyboard' | 'touch'>('keyboard');
-    const [qrUrl, setQrUrl] = useState('');
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -34,8 +34,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ bindings, onSave, mobileS
         if (listeningKey) {
             window.addEventListener('keydown', handleKeyDown);
         }
-
-        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.href)}`);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
@@ -213,20 +211,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ bindings, onSave, mobileS
 
                     {/* Right: Utils */}
                     <div className="w-full lg:w-72 bg-slate-950 p-6 flex flex-col gap-6 flex-shrink-0 border-t lg:border-t-0 border-gray-700">
-                        {/* Mobile Connect Section */}
-                        <div className="bg-slate-800 rounded-xl p-4 border border-slate-600 flex flex-col items-center text-center hidden md:flex">
-                            <div className="flex items-center gap-2 text-white font-bold mb-3">
-                                <Smartphone className="text-green-400" size={20}/> 모바일 접속
-                            </div>
-                            <div className="bg-white p-2 rounded-lg mb-2">
-                                <img src={qrUrl} alt="Scan to play on mobile" className="w-32 h-32" />
-                            </div>
-                            <p className="text-xs text-gray-400">
-                                핸드폰 카메라로 스캔하여<br/>
-                                모바일에서 플레이하세요!
-                            </p>
-                        </div>
-
                         {/* Actions */}
                         <div className="bg-slate-800 rounded-xl p-4 border border-slate-600 flex flex-col gap-2">
                             <button 

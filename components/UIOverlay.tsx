@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Player, Quest, Enemy, WeaponType, KeyBindings, MobileControlSettings } from '../types';
-import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Camera, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp, Maximize2, Minimize2, Menu, X, RotateCcw } from 'lucide-react';
+import { Star, Map, Skull, Lock, AlertTriangle, ShoppingBag, Zap, Settings, Crown, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Sword, ChevronsUp, Maximize2, Minimize2, Menu, X, RotateCcw } from 'lucide-react';
 import { WEAPONS, SKILL_TREE, ADVANCED_CLASS_NAMES, DEFAULT_MOBILE_SETTINGS } from '../constants';
 
 interface UIOverlayProps {
@@ -16,7 +16,6 @@ interface UIOverlayProps {
   onOpenMap: () => void;
   onOpenSkills?: () => void;
   onOpenSettings?: () => void;
-  onOpenImageEditor?: () => void;
   onSwitchWeapon?: (weapon: WeaponType) => void;
   onJobAdvance?: () => void; 
   stageLevel: number;
@@ -29,7 +28,7 @@ interface UIOverlayProps {
 }
 
 const UIOverlay: React.FC<UIOverlayProps> = ({ 
-  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onOpenImageEditor, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu, mobileSettings
+  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu, mobileSettings
 }) => {
   const hpPercent = (player.hp / player.maxHp) * 100;
   const mpPercent = (player.mp / player.maxMp) * 100;
@@ -162,7 +161,8 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
       <div className="flex justify-between items-start w-full pointer-events-auto">
         
         {/* LEFT: Player Status */}
-        <div className="flex gap-2 md:gap-3 scale-90 origin-top-left md:scale-100 mt-2 md:mt-0">
+        {/* Added scale-75 for mobile to reduce overlap */}
+        <div className={`flex gap-2 md:gap-3 mt-2 md:mt-0 origin-top-left ${showVirtualControls ? 'scale-75' : 'scale-90 md:scale-100'}`}>
              <div className="relative">
                  <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-800 border-2 border-slate-600 rounded-lg flex items-center justify-center text-3xl md:text-4xl shadow-lg z-10 relative">
                      {player.emoji}
@@ -191,7 +191,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                  <div className="relative h-3 md:h-4 bg-slate-900/80 rounded-sm border border-slate-600 overflow-hidden group">
                     <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all duration-300" style={{ width: `${Math.max(0, mpPercent)}%` }} />
                     <div className="absolute inset-0 flex items-center justify-center text-[8px] md:text-[9px] font-bold text-white/90 group-hover:text-white drop-shadow-sm z-10">
-                       {player.mp} / {player.maxMp}
+                       {Math.floor(player.mp)} / {player.maxMp}
                     </div>
                  </div>
 
@@ -224,7 +224,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
         </div>
 
         {/* RIGHT: Menu Buttons */}
-        <div className="flex flex-col items-end gap-3 scale-90 origin-top-right md:scale-100 mt-2 md:mt-0">
+        <div className="flex flex-col items-end gap-3 mt-2 md:mt-0">
              {/* Desktop Menu - Hidden on Mobile */}
              <div className="hidden lg:flex gap-2">
                  <button 
@@ -240,13 +240,6 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                     title="전체화면"
                  >
                      {isFullscreen ? <Minimize2 className="w-5 h-5"/> : <Maximize2 className="w-5 h-5"/>}
-                 </button>
-                 <button 
-                    onClick={onOpenImageEditor}
-                    className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg border border-slate-600 shadow-lg active:scale-95 transition-all group relative"
-                    title="AI 스튜디오"
-                 >
-                     <Camera className="w-5 h-5 group-hover:text-pink-400" />
                  </button>
                  <button 
                     onClick={onOpenSkills}
@@ -284,17 +277,32 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                  </button>
              </div>
              
-             {/* Mobile Menu Toggle - Visible on Mobile landscape or when forced */}
+             {/* Mobile Menu & Potions - Visible on Mobile landscape */}
              {showVirtualControls && (
-                 <div className="lg:hidden pointer-events-auto">
+                 <div className="lg:hidden pointer-events-auto flex gap-2 items-center absolute top-4 right-4">
+                     {/* Mobile Potions (Moved from MobileControls to Overlay) */}
+                     <button
+                        onPointerDown={(e) => { e.preventDefault(); simulateKey(keyBindings.POTION_HP, 'keydown'); }}
+                        className="w-10 h-10 bg-red-950 border border-red-600 rounded-full flex items-center justify-center active:scale-95 relative"
+                     >
+                         <span className="text-lg">🍷</span>
+                         <span className="absolute -top-1 -right-1 bg-red-600 text-[9px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-black">{player.hpPotions}</span>
+                     </button>
+                     <button
+                        onPointerDown={(e) => { e.preventDefault(); simulateKey(keyBindings.POTION_MP, 'keydown'); }}
+                        className="w-10 h-10 bg-blue-950 border border-blue-600 rounded-full flex items-center justify-center active:scale-95 relative"
+                     >
+                         <span className="text-lg">🧪</span>
+                         <span className="absolute -top-1 -right-1 bg-blue-600 text-[9px] w-4 h-4 rounded-full flex items-center justify-center text-white border border-black">{player.mpPotions}</span>
+                     </button>
+
                      <button 
                         onPointerDown={(e) => { 
                             e.preventDefault(); 
                             e.stopPropagation();
                             if (onCloseMenu) onCloseMenu(); // This toggles it in parent
                         }}
-                        className="bg-slate-800/80 hover:bg-slate-700 text-white p-2.5 rounded-full border border-slate-500/50 shadow-xl active:scale-95 transition-all fixed top-4 right-4 z-50 touch-none backdrop-blur-sm"
-                        style={{ pointerEvents: 'auto' }}
+                        className="bg-slate-800/80 hover:bg-slate-700 text-white p-2 rounded-full border border-slate-500/50 shadow-xl active:scale-95 transition-all backdrop-blur-sm ml-2"
                      >
                          <Menu className="w-6 h-6" />
                      </button>
@@ -332,7 +340,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                             disabled={loadingQuest}
                             className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors shadow-lg animate-pulse"
                         >
-                            {loadingQuest ? "수신중..." : "퀘스트 받기"}
+                            {loadingQuest ? "준비중..." : "퀘스트 받기"}
                         </button>
                     </div>
                 )}
@@ -370,10 +378,6 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                    <button type="button" onClick={() => { handleCloseMenu(); onOpenSettings && onOpenSettings(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-gray-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <Settings size={40} className="text-gray-300" />
                        <span className="text-white font-bold text-lg">설정 (Settings)</span>
-                   </button>
-                   <button type="button" onClick={() => { handleCloseMenu(); onOpenImageEditor && onOpenImageEditor(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
-                       <Camera size={40} className="text-pink-400" />
-                       <span className="text-white font-bold text-lg">AI 스튜디오</span>
                    </button>
                    <button type="button" onClick={() => { handleCloseMenu(); onRestart(); }} className="cursor-pointer touch-manipulation flex flex-col items-center justify-center bg-red-900/30 border-2 border-red-700 hover:border-red-500 rounded-xl p-6 gap-3 active:scale-95 transition-all">
                        <RotateCcw size={40} className="text-red-400"/>
@@ -473,14 +477,6 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                             size={45}
                             color="bg-purple-600/60 border-purple-400"
                             style={{ right: 170, bottom: 40 }}
-                        />
-                        {/* Potion HP Quick Access */}
-                        <MobileButton 
-                            code={keyBindings.POTION_HP} 
-                            label="HP"
-                            size={40}
-                            color="bg-red-800/60 border-red-500"
-                            style={{ right: 10, top: 20 }}
                         />
                     </div>
                </div>

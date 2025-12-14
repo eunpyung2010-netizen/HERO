@@ -1,26 +1,25 @@
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { 
-    Player, Enemy, Projectile, GameState, Item, 
-    Direction, Quest, Rect, WeaponType, KeyBindings, ClassType
+    Player, Enemy, Projectile, Particle, Item, GameState, 
+    Quest, KeyBindings, ClassType, WeaponType, Entity, Rect, Lightning 
 } from '../types';
 import { 
     GRAVITY, FRICTION, MOVE_SPEED, JUMP_FORCE, GROUND_Y, 
     VIEWPORT_WIDTH, VIEWPORT_HEIGHT, BIOMES, ENEMY_TYPES, 
-    WEAPONS, LEVELS_EXP, PLAYER_WIDTH, PLAYER_HEIGHT, UPGRADE_COSTS,
-    SKILL_TREE, CLASS_INFOS, ADVANCED_CLASS_NAMES
+    WEAPONS, LEVELS_EXP, PLAYER_WIDTH, PLAYER_HEIGHT, 
+    SKILL_TREE, CLASS_INFOS, ADVANCED_CLASS_NAMES, UPGRADE_COSTS 
 } from '../constants';
 import { SoundService } from '../services/soundService';
-import { generateChat } from '../services/geminiService';
+import { getRandomChat } from '../services/gameService';
 
 export interface GameCanvasHandle {
     purchasePotion: (type: 'HP' | 'MP') => boolean;
-    upgradeStat: (stat: 'ATK' | 'HP' | 'MP', cost: number) => boolean;
+    upgradeStat: (type: 'ATK' | 'HP' | 'MP', cost: number) => boolean;
     switchWeapon: (weapon: WeaponType) => void;
-    assignSkillSlot: (skillId: string, slotKey: string) => string; 
-    upgradeSkill: (skillId: string) => boolean;
-    getSnapshot: () => string;
-    jobAdvance: () => boolean; 
+    upgradeSkill: (skillId: string) => void;
+    assignSkillSlot: (skillId: string, slotKey: string) => string;
+    jobAdvance: () => void;
     unlockAllSkills: () => void;
 }
 
@@ -28,1761 +27,1249 @@ interface GameCanvasProps {
     onStatsUpdate: (player: Player, boss: Enemy | null, stageLevel: number, biomeName: string) => void;
     onEventLog: (msg: string) => void;
     onGameOver: () => void;
-    onQuestUpdate: (newCount: number) => void;
-    onQuestComplete: (rewardExp: number, rewardGold: number) => void;
+    onQuestUpdate: (count: number) => void;
+    onQuestComplete: (exp: number, gold: number) => void;
     gameActive: boolean;
     currentQuest: Quest | null;
     keyBindings: KeyBindings;
-    backgroundImage?: string | null;
     initialClass?: ClassType;
 }
 
 const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({ 
-    onStatsUpdate, onEventLog, onGameOver, onQuestUpdate, onQuestComplete, gameActive, currentQuest, keyBindings, backgroundImage, initialClass
+    onStatsUpdate, onEventLog, onGameOver, onQuestUpdate, onQuestComplete, 
+    gameActive, currentQuest, keyBindings, initialClass 
 }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const requestRef = useRef<number | null>(null);
+    const requestRef = useRef<number>();
     const keysPressed = useRef<Set<string>>(new Set());
-    const mouseRef = useRef<{x: number, y: number}>({ x: 0, y: 0 });
     
-    // Background Image Handling
-    const bgImageRef = useRef<HTMLImageElement | null>(null);
-    useEffect(() => {
-        if (backgroundImage) {
-            const img = new Image();
-            img.src = backgroundImage;
-            img.onload = () => { bgImageRef.current = img; };
-        } else {
-            bgImageRef.current = null;
-        }
-    }, [backgroundImage]);
-    
-    // Clear keys when game is paused to prevent "stuck" movement
-    useEffect(() => {
-        if (!gameActive) {
-            keysPressed.current.clear();
-        }
-    }, [gameActive]);
+    // Refs to avoid stale closures in game loop
+    const gameActiveRef = useRef(gameActive);
+    const keyBindingsRef = useRef(keyBindings);
+    const currentQuestRef = useRef(currentQuest);
 
-    const latestProps = useRef({ currentQuest, onQuestUpdate, onQuestComplete, onEventLog, onGameOver, keyBindings, onStatsUpdate });
-    useEffect(() => {
-        latestProps.current = { currentQuest, onQuestUpdate, onQuestComplete, onEventLog, onGameOver, keyBindings, onStatsUpdate };
-    }, [currentQuest, onQuestUpdate, onQuestComplete, onEventLog, onGameOver, keyBindings, onStatsUpdate]);
+    useEffect(() => { gameActiveRef.current = gameActive; }, [gameActive]);
+    useEffect(() => { keyBindingsRef.current = keyBindings; }, [keyBindings]);
+    useEffect(() => { currentQuestRef.current = currentQuest; }, [currentQuest]);
 
-    // Game State
-    const gameState = useRef<GameState>({
-        player: {
-            id: 'player', x: 100, y: GROUND_Y - PLAYER_HEIGHT, width: PLAYER_WIDTH, height: PLAYER_HEIGHT,
-            vx: 0, vy: 0, color: 'blue', emoji: '🧙‍♂️', direction: Direction.RIGHT, isDead: false,
-            hp: 100, maxHp: 100, mp: 100, maxMp: 100, shield: 0, level: 1, exp: 0, maxExp: 100,
-            attack: 10, name: '용사', isAttacking: false, isDownAttacking: false, 
-            attackCooldown: 0, maxAttackCooldown: 20, classType: 'Warrior', isAdvanced: false,
-            currentWeapon: 'Sword', unlockedWeapons: ['Sword'], weaponRotation: 0,
-            invincibilityTimer: 0, gold: 0, hpPotions: 3, mpPotions: 3, maxStageReached: 1,
-            sp: 0, skills: {}, skillSlots: {}, cooldowns: {}, jumps: 0, maxJumps: 1, buffs: {}
-        },
-        enemies: [], particles: [], projectiles: [], platforms: [], items: [], lightnings: [],
-        cameraX: 0, worldWidth: 2000, stageLevel: 1, shakeTimer: 0, biomeIndex: 0
+    // Mutable Game State
+    const state = useRef<GameState>({
+        player: null as any, 
+        enemies: [],
+        particles: [],
+        projectiles: [],
+        platforms: [],
+        items: [],
+        lightnings: [],
+        cameraX: 0,
+        worldWidth: 3000,
+        stageLevel: 1,
+        shakeTimer: 0,
+        biomeIndex: 0
     });
 
-    const forceUIUpdate = () => {
-        const s = gameState.current;
-        const biome = BIOMES[s.biomeIndex];
-        const boss = s.enemies.find(e => e.isBoss) || null;
-        latestProps.current.onStatsUpdate({ ...s.player }, boss, s.stageLevel, biome.name);
-    };
+    const lastTime = useRef<number>(0);
+    const spawnTimer = useRef<number>(0);
+    const damageNumbers = useRef<{x: number, y: number, text: string, life: number, color: string, vy: number}[]>([]);
 
-    const loadStage = (level: number) => {
-        const state = gameState.current;
-        state.stageLevel = level;
-        
-        let bIndex = BIOMES.findIndex(b => level >= b.startStage && level <= b.endStage);
-        if (bIndex === -1) bIndex = BIOMES.length - 1;
-        state.biomeIndex = bIndex;
-
-        state.enemies = [];
-        state.projectiles = [];
-        state.particles = [];
-        state.items = [];
-        state.platforms = [];
-        state.lightnings = [];
-        
-        state.player.x = 100;
-        state.player.y = GROUND_Y - PLAYER_HEIGHT;
-        state.player.vx = 0;
-        state.player.vy = 0;
-        state.cameraX = 0;
-
+    // Helper to generate platforms
+    const generatePlatforms = (worldWidth: number) => {
+        const platforms: Rect[] = [];
         // Ground
-        state.platforms.push({ x: -1000, y: GROUND_Y, width: state.worldWidth + 2000, height: 200 });
-
-        // Platforms
-        const platCount = 5 + Math.floor(Math.random() * 5);
-        for(let i=0; i<platCount; i++) {
+        platforms.push({ x: -1000, y: GROUND_Y, width: worldWidth + 2000, height: 200 });
+        
+        // Random Platforms
+        const count = 10 + Math.floor(worldWidth / 300);
+        for(let i = 0; i < count; i++) {
             const w = 150 + Math.random() * 200;
-            const x = 300 + Math.random() * (state.worldWidth - 600);
+            const x = 400 + Math.random() * (worldWidth - 800);
             const y = GROUND_Y - 100 - Math.random() * 250;
-            state.platforms.push({ x, y, width: w, height: 20 });
-        }
-
-        // Mobs
-        const biomeMobs = [
-             ['Snail', 'Slime', 'Mushroom', 'Boar'], 
-             ['Cactus', 'Scorpion', 'Snake', 'Vulture'], 
-             ['Wolf', 'Yeti', 'Penguin', 'IceGolem'], 
-             ['Robot', 'Drone', 'Cyborg', 'Alien'], 
-             ['Angel', 'Guardian', 'Pegasus', 'CloudSpirit'], 
-             ['FireSpirit', 'Dragon', 'Zombie', 'Demon'] 
-        ];
-        
-        const mobs = biomeMobs[state.biomeIndex] || biomeMobs[0];
-        const enemyCount = 5 + level; 
-        
-        for(let i=0; i<enemyCount; i++) {
-             const type = mobs[Math.floor(Math.random() * mobs.length)];
-             const x = 500 + Math.random() * (state.worldWidth - 600);
-             spawnEnemy(x, type as any);
-        }
-
-        if (level % 5 === 0) {
-             const bossType = mobs[mobs.length - 1]; 
-             spawnEnemy(state.worldWidth - 400, bossType as any, true);
-        }
-
-        if(latestProps.current) latestProps.current.onEventLog(`스테이지 ${level} 시작!`);
-        forceUIUpdate();
-    };
-
-    useEffect(() => {
-        if (initialClass) {
-            if (gameState.current.player.classType !== initialClass || gameState.current.platforms.length === 0) {
-                const p = gameState.current.player;
-                const info = CLASS_INFOS[initialClass];
-                p.classType = initialClass;
-                p.currentWeapon = info.weapon;
-                p.unlockedWeapons = [info.weapon];
-                p.emoji = info.icon;
-                p.skills = {};
-                p.skillSlots = {};
-                p.sp = 0;
-                p.shield = 0;
-                p.buffs = {};
-                p.isAdvanced = false;
-                loadStage(1);
-                forceUIUpdate();
+            
+            // Avoid overlapping too much (simple check)
+            if (!platforms.some(p => Math.abs(p.x - x) < 100 && Math.abs(p.y - y) < 50)) {
+                platforms.push({ x, y, width: w, height: 20 });
             }
         }
+        return platforms;
+    };
+
+    // Initialize Game
+    useEffect(() => {
+        const cls = initialClass || 'Warrior';
+        const info = CLASS_INFOS[cls];
+        
+        state.current.player = {
+            id: 'player', x: 100, y: GROUND_Y - PLAYER_HEIGHT, width: PLAYER_WIDTH, height: PLAYER_HEIGHT,
+            vx: 0, vy: 0, color: 'blue', emoji: info.icon, direction: 1, isDead: false,
+            hp: 100, maxHp: 100, mp: 100, maxMp: 100, shield: 0,
+            level: 1, exp: 0, maxExp: LEVELS_EXP[1], attack: 10,
+            name: info.name, classType: cls, isAdvanced: false,
+            isAttacking: false, isDownAttacking: false, attackCooldown: 0, maxAttackCooldown: 20,
+            currentWeapon: info.weapon, unlockedWeapons: [info.weapon],
+            weaponRotation: 0, invincibilityTimer: 0, gold: 0,
+            hpPotions: 3, mpPotions: 3, maxStageReached: 1, sp: 0,
+            skills: {}, skillSlots: {}, cooldowns: {}, jumps: 0, maxJumps: 1,
+            buffs: {}
+        };
+        
+        state.current.worldWidth = 3000;
+        state.current.platforms = generatePlatforms(state.current.worldWidth);
+        state.current.enemies = [];
+        state.current.projectiles = [];
+        state.current.particles = [];
+        state.current.items = [];
+        state.current.stageLevel = 1;
+        state.current.biomeIndex = 0;
+        state.current.cameraX = 0;
+
+        // Reset time to prevent huge dt on start
+        lastTime.current = performance.now();
+
+        // Start Loop
+        requestRef.current = requestAnimationFrame(gameLoop);
+
+        return () => {
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        };
     }, [initialClass]);
 
-    const performSwitchWeapon = (weapon: WeaponType) => {
-        const player = gameState.current.player;
-        if (player.unlockedWeapons.includes(weapon)) {
-            player.currentWeapon = weapon;
-            latestProps.current.onEventLog(`무기 장착: ${WEAPONS[weapon].emoji} ${weapon}`);
-            forceUIUpdate();
-        } else {
-            latestProps.current.onEventLog('아직 해금되지 않은 무기입니다.');
-        }
-    };
-
-    useImperativeHandle(ref, () => ({
-        purchasePotion: (type: 'HP' | 'MP') => {
-            const s = gameState.current;
-            const cost = UPGRADE_COSTS.POTION;
-            if (s.player.gold >= cost) {
-                s.player.gold -= cost;
-                if (type === 'HP') s.player.hpPotions++;
-                if (type === 'MP') s.player.mpPotions++;
-                SoundService.playCoin();
-                createParticle(s.player.x, s.player.y - 50, `+1 ${type} Potion`, type === 'HP' ? 'red' : 'blue');
-                forceUIUpdate();
-                return true;
-            }
-            return false;
-        },
-        upgradeStat: (stat: 'ATK' | 'HP' | 'MP', cost: number) => {
-            const s = gameState.current;
-            if (s.player.gold >= cost) {
-                s.player.gold -= cost;
-                if (stat === 'ATK') {
-                    s.player.attack += 5;
-                    createParticle(s.player.x, s.player.y - 50, "ATK UP!", "orange", 100);
-                }
-                if (stat === 'HP') {
-                    s.player.maxHp += 50;
-                    s.player.hp = s.player.maxHp;
-                    createParticle(s.player.x, s.player.y - 50, "MAX HP UP!", "red", 100);
-                }
-                if (stat === 'MP') {
-                    s.player.maxMp += 30;
-                    s.player.mp = s.player.maxMp;
-                    createParticle(s.player.x, s.player.y - 50, "MAX MP UP!", "blue", 100);
-                }
-                SoundService.playLevelUp();
-                forceUIUpdate();
-                return true;
-            }
-            return false;
-        },
-        switchWeapon: (weapon: WeaponType) => {
-            performSwitchWeapon(weapon);
-        },
-        assignSkillSlot: (skillId: string, slotKey: string) => {
-            const slots = gameState.current.player.skillSlots;
-            if (slots[slotKey] === skillId) {
-                delete slots[slotKey];
-                forceUIUpdate();
-                return 'removed';
-            } else {
-                gameState.current.player.skillSlots[slotKey] = skillId;
-                forceUIUpdate();
-                return 'assigned';
-            }
-        },
-        upgradeSkill: (skillId: string) => {
-            const s = gameState.current.player;
-            const skillDef = SKILL_TREE.find(skill => skill.id === skillId);
-            
-            if (!skillDef) return false;
-            
-            const currentLevel = s.skills[skillId] || 0;
-
-            if (s.sp <= 0) return false;
-            if (currentLevel >= skillDef.maxLevel) return false;
-            if (s.level < skillDef.reqLevel) return false;
-            if (skillDef.reqSkill && (s.skills[skillDef.reqSkill] || 0) < 1) return false; 
-
-            s.sp--;
-            s.skills[skillId] = currentLevel + 1;
-            
-            if (skillId === 'IronBody') {
-                s.maxHp += 50;
-                s.hp += 50;
-            }
-            if (skillId === 'Meditation') {
-                s.maxMp += 30;
-                s.mp += 30;
-            }
-            if (skillId === 'DoubleJump') {
-                s.maxJumps = 2;
-            }
-
-            SoundService.playLevelUp();
-            createParticle(s.x, s.y - 60, `${skillDef.name} UP!`, '#ffff00', 120);
-            
-            forceUIUpdate();
-            return true;
-        },
-        jobAdvance: () => {
-            const p = gameState.current.player;
-            if (p.isAdvanced || p.level < 30) return false;
-
-            p.isAdvanced = true;
-            const newName = ADVANCED_CLASS_NAMES[p.classType];
-            
-            let newWeapon: WeaponType = 'Sword'; 
-            if (p.classType === 'Warrior') newWeapon = 'Greatsword';
-            if (p.classType === 'Lancer') newWeapon = 'Polearm';
-            if (p.classType === 'Archer') newWeapon = 'Crossbow';
-            if (p.classType === 'Gunner') newWeapon = 'Cannon';
-            if (p.classType === 'Mage') newWeapon = 'Staff';
-
-            if (!p.unlockedWeapons.includes(newWeapon)) {
-                p.unlockedWeapons.push(newWeapon);
-            }
-            p.currentWeapon = newWeapon;
-
-            createParticle(p.x, p.y - 80, "JOB ADVANCEMENT!", "#00ffff", 150);
-            createParticle(p.x, p.y - 50, `${newName} 전직 완료!`, "#ffffff", 150);
-            createParticle(p.x, p.y - 20, `${newWeapon} 획득!`, "#ffff00", 150);
-            
-            SoundService.playLevelUp();
-            latestProps.current.onEventLog(`축하합니다! ${newName}로 전직하였습니다!`);
-            forceUIUpdate();
-            return true;
-        },
-        unlockAllSkills: () => {
-            const p = gameState.current.player;
-            p.level = 50;
-            p.maxHp = 5000; p.hp = 5000;
-            p.maxMp = 3000; p.mp = 3000;
-            p.sp = 100; // Extra SP
-            p.gold += 100000;
-            p.isAdvanced = true;
-            
-            let newWeapon: WeaponType | null = null;
-            if (p.classType === 'Warrior') newWeapon = 'Greatsword';
-            if (p.classType === 'Lancer') newWeapon = 'Polearm';
-            if (p.classType === 'Archer') newWeapon = 'Crossbow';
-            if (p.classType === 'Gunner') newWeapon = 'Cannon';
-            if (p.classType === 'Mage') newWeapon = 'Staff';
-
-            if (newWeapon && !p.unlockedWeapons.includes(newWeapon)) {
-                p.unlockedWeapons.push(newWeapon);
-                p.currentWeapon = newWeapon;
-            }
-
-            SKILL_TREE.forEach(skill => {
-                if (skill.classType === 'All' || skill.classType === p.classType) {
-                    p.skills[skill.id] = skill.maxLevel;
-                    if (skill.id === 'DoubleJump') p.maxJumps = 2;
-                }
-            });
-
-            createParticle(p.x, p.y - 80, "TEST MODE ACTIVATED!", "#ff00ff", 200, 1.5);
-            SoundService.playLevelUp();
-            forceUIUpdate();
-        },
-        getSnapshot: () => {
-            if (canvasRef.current) {
-                return canvasRef.current.toDataURL('image/png');
-            }
-            return '';
-        }
-    }));
-
-    const checkCollision = (r1: Rect, r2: Rect) => {
-        return (
-            r1.x < r2.x + r2.width &&
-            r1.x + r1.width > r2.x &&
-            r1.y < r2.y + r2.height &&
-            r1.y + r1.height > r2.y
-        );
-    };
-
-    const createParticle = (x: number, y: number, text: string, color: string, life = 60, scale = 1) => {
-        // Optimization: Cap particles to prevent lag
-        if (gameState.current.particles.length > 50) return;
-        
-        gameState.current.particles.push({
-            id: Math.random().toString(),
-            x, y, text, color, life, maxLife: life,
-            vx: (Math.random() - 0.5) * 2,
-            vy: -2 - Math.random() * 2,
-            scale
-        });
-    };
-
-    const spawnItem = (x: number, y: number, forceType?: 'HpPotion' | 'MpPotion' | 'Gold' | 'Weapon' | 'QuestItem', weaponType?: WeaponType, questItemName?: string, questItemEmoji?: string, customValue?: number) => {
-        let type: 'Gold' | 'HpPotion' | 'MpPotion' | 'Weapon' | 'QuestItem' = 'Gold';
-        if (forceType) type = forceType;
-        else {
-            const rand = Math.random();
-            if (rand > 0.9) type = 'HpPotion';
-            else if (rand > 0.8) type = 'MpPotion';
-            else type = 'Gold';
-        }
-
-        let emoji = '💰';
-        if (type === 'HpPotion') emoji = '🍷';
-        if (type === 'MpPotion') emoji = '🧪';
-        if (type === 'Weapon') emoji = WEAPONS[weaponType!].emoji;
-        if (type === 'QuestItem') emoji = questItemEmoji || '📦';
-
-        let val = 10;
-        if (customValue !== undefined) {
-            val = customValue;
-        } else {
-             if (type === 'HpPotion' || type === 'MpPotion' || type === 'QuestItem') val = 1;
-             else val = Math.floor(Math.random() * 50) + 10;
-        }
-        
-        const greedLevel = gameState.current.player.skills['Greed'] || 0;
-        if (type === 'Gold' && greedLevel > 0) {
-            val = Math.floor(val * (1 + greedLevel * 0.1));
-        }
-
-        const item: Item = {
-            id: Math.random().toString(),
-            x, y, width: 30, height: 30,
-            type, weaponType, questItemName,
-            value: val,
-            emoji, vx: (Math.random() - 0.5) * 8, vy: -5 - Math.random() * 3, life: 900
-        };
-        gameState.current.items.push(item);
-    };
-
-    const spawnEnemy = (x: number, type: keyof typeof ENEMY_TYPES, isBoss = false) => {
-        const config = ENEMY_TYPES[type];
-        const scale = isBoss ? 2 : 1;
-        
-        const spawnOnPlatform = Math.random() < 0.4 && gameState.current.platforms.length > 1;
-        let spawnY = GROUND_Y - config.height * scale;
-        let spawnX = x;
-
-        if (spawnOnPlatform && !isBoss) {
-            const validPlatforms = gameState.current.platforms.slice(1); 
-            if (validPlatforms.length > 0) {
-                const plat = validPlatforms[Math.floor(Math.random() * validPlatforms.length)];
-                spawnY = plat.y - config.height * scale;
-                spawnX = plat.x + Math.random() * plat.width;
-            }
-        }
-
-        const enemy: Enemy = {
-            id: Math.random().toString(36).substr(2, 9),
-            x: spawnX, 
-            y: spawnY,
-            width: config.width * scale,
-            height: config.height * scale,
-            vx: isBoss ? config.speed * 0.7 : config.speed,
-            vy: 0,
-            color: 'green',
-            emoji: config.emoji,
-            direction: Direction.RIGHT,
-            isDead: false,
-            hp: isBoss ? config.hp * 5 : config.hp,
-            maxHp: isBoss ? config.hp * 5 : config.hp,
-            damage: isBoss ? config.damage * 1.2 : config.damage,
-            expValue: isBoss ? config.exp * 50 : config.exp,
-            type: isBoss ? `Giant ${type}` : type,
-            patrolStart: x - 300,
-            patrolEnd: x + 300,
-            attackTimer: 0,
-            isBoss: isBoss,
-            freezeTimer: 0,
-            stunTimer: 0,
-            isRanged: config.isRanged || false
-        };
-        gameState.current.enemies.push(enemy);
-    };
-
-    const createLightning = (targetX: number, targetY: number) => {
-        const startX = targetX + (Math.random() - 0.5) * 100;
-        const startY = -100;
-        const points: {x: number, y: number}[] = [];
-        const steps = 8; // Reduced steps for optimization
-        points.push({x: startX, y: startY});
-        for(let i = 1; i < steps; i++) {
-            const t = i / steps;
-            const x = startX + (targetX - startX) * t + (Math.random() - 0.5) * 60;
-            const y = startY + (targetY - startY) * t;
-            points.push({x, y});
-        }
-        points.push({x: targetX, y: targetY});
-        gameState.current.lightnings.push({
-            id: Math.random().toString(),
-            points: points,
-            life: 10, maxLife: 10, color: '#ffffff', width: 3 + Math.random() * 2
-        });
-    };
-
-    const attemptAttack = () => {
-        const state = gameState.current;
-        const player = state.player;
-        
-        if (player.isAttacking || player.attackCooldown > 0) return;
-        if (player.isDead) return;
-
-        player.isAttacking = true;
-        const weapon = WEAPONS[player.currentWeapon];
-        player.attackCooldown = weapon.cooldown;
-        player.maxAttackCooldown = weapon.cooldown;
-
-        SoundService.playAttack();
-        
-        const isDownKeyPressed = keysPressed.current.has(latestProps.current.keyBindings.DOWN);
-        const isInAir = player.jumps > 0 || Math.abs(player.vy) > 0.1;
-        player.isDownAttacking = isDownKeyPressed && isInAir;
-
-        const isRanged = weapon.type === 'ranged';
-        
-        if (isRanged) {
-             const weaponData = WEAPONS[player.currentWeapon] as any;
-             const projectileEmoji = weaponData.projectile || '•';
-             const isPiercing = player.currentWeapon === 'Crossbow';
-             const isExplosive = player.currentWeapon === 'Cannon';
-
-             let vx = player.direction * weapon.speed;
-             let vy = (Math.random() - 0.5) * 1;
-             
-             if (player.isDownAttacking) {
-                 vx = 0;
-                 vy = weapon.speed * 0.8; 
-             }
-
-             state.projectiles.push({
-                id: Math.random().toString(),
-                x: player.x + (player.isDownAttacking ? player.width/2 - 10 : (player.direction === 1 ? player.width : 0)),
-                y: player.y + (player.isDownAttacking ? player.height : 30),
-                width: isExplosive ? 40 : 30,
-                height: isExplosive ? 40 : 30,
-                vx: vx,
-                vy: vy,
-                damage: player.attack * weapon.damageMult,
-                color: 'white',
-                emoji: projectileEmoji,
-                life: isExplosive ? 100 : 60, 
-                isDead: false, 
-                isMagic: player.currentWeapon === 'Staff',
-                piercing: isPiercing,
-                explosive: isExplosive,
-                weaponType: player.currentWeapon,
-                rotation: player.isDownAttacking ? 90 : undefined
-             });
-        } else {
-             setTimeout(() => {
-                 let hitSomething = false;
-                 state.enemies.forEach(e => {
-                     if (!e.isDead) {
-                         let inRange = false;
-                         const dist = Math.abs((player.x + player.width/2) - (e.x + e.width/2));
-                         
-                         if (player.isDownAttacking) {
-                             const verticalDist = (e.y) - (player.y + player.height);
-                             if (Math.abs((player.x + player.width/2) - (e.x + e.width/2)) < 60 && verticalDist > -50 && verticalDist < weapon.range) {
-                                 inRange = true;
-                             }
-                         } else {
-                             const facing = (player.direction === 1 && e.x > player.x) || (player.direction === -1 && e.x < player.x);
-                             if (dist < weapon.range && facing && Math.abs(player.y - e.y) < 120) {
-                                 inRange = true;
-                             }
-                         }
-
-                         if (inRange) {
-                             let damageMod = 1.0;
-                             if (player.currentWeapon === 'Spear' || player.currentWeapon === 'Polearm') {
-                                 if (!player.isDownAttacking) {
-                                     if (dist > weapon.range * 0.6) damageMod = 1.3;
-                                     else damageMod = 0.7; 
-                                 }
-                             }
-                             applyDamage(e, player.attack * weapon.damageMult * damageMod, player.direction, damageMod);
-                             hitSomething = true;
-                         }
-                     }
-                 });
-
-                 if (player.isDownAttacking && hitSomething) {
-                     player.vy = -12; 
-                     player.jumps = 1; 
-                 }
-
-             }, 100);
-             
-             const isStabbingWeapon = player.currentWeapon === 'Spear' || player.currentWeapon === 'Polearm';
-             if (!isStabbingWeapon || player.isDownAttacking) {
-                 const splashSize = (player.currentWeapon === 'Greatsword') ? 60 : 30;
-                 if (player.isDownAttacking) {
-                     createParticle(player.x, player.y + player.height, "⏬", "white", 15);
-                 } else {
-                     createParticle(player.x + (player.direction * splashSize), player.y, "⚔️", "white", 15);
-                 }
-             }
-        }
-    };
-
-    const usePotion = (type: 'HP' | 'MP') => {
-        const player = gameState.current.player;
-        if (type === 'HP') {
-            if (player.hpPotions > 0 && player.hp < player.maxHp) {
-                player.hpPotions--;
-                player.hp = Math.min(player.maxHp, player.hp + 50);
-                SoundService.playDrink();
-                createParticle(player.x, player.y - 40, "+50 HP", "red");
-                forceUIUpdate();
-            } else if(player.hpPotions <= 0) {
-                 latestProps.current.onEventLog("HP 물약이 없습니다.");
-            }
-        } else {
-            if (player.mpPotions > 0 && player.mp < player.maxMp) {
-                player.mpPotions--;
-                player.mp = Math.min(player.maxMp, player.mp + 50);
-                SoundService.playDrink();
-                createParticle(player.x, player.y - 40, "+50 MP", "blue");
-                forceUIUpdate();
-            } else if(player.mpPotions <= 0) {
-                 latestProps.current.onEventLog("MP 물약이 없습니다.");
-            }
-        }
-    };
-
-    const useActiveSkill = (slotKey: string) => {
-        const state = gameState.current;
-        const player = state.player;
-        const skillId = player.skillSlots[slotKey];
-        
-        if (!skillId) return; 
-
-        const skillDef = SKILL_TREE.find(s => s.id === skillId);
-        if (!skillDef || (skillDef.type !== 'active' && skillDef.type !== 'buff')) return;
-
-        const skillLevel = player.skills[skillId] || 0;
-        if (skillLevel <= 0) {
-            latestProps.current.onEventLog("아직 배우지 않은 스킬입니다.");
-            return;
-        }
-
-        if (player.cooldowns[skillId] > 0) return;
-
-        if (player.mp < (skillDef.mpCost || 0)) {
-            createParticle(player.x, player.y - 40, "No MP!", "#5555ff");
-            return;
-        }
-
-        player.mp -= (skillDef.mpCost || 0);
-        player.cooldowns[skillId] = (skillDef.cooldown || 60);
-        
-        if (skillDef.type === 'buff') {
-            player.buffs[skillId] = (skillDef.duration || 600) + (skillLevel * 120);
-            createParticle(player.x, player.y - 50, `${skillDef.name}!`, '#00ffff', 120);
-            SoundService.playEquip();
-            forceUIUpdate();
-            return;
-        }
-
-        player.isAttacking = true;
-        player.attackCooldown = 20; 
-        player.maxAttackCooldown = 20;
-
-        let buffMultiplier = 1.0;
-        if (player.buffs['Rage']) buffMultiplier += 0.5;
-        if (player.buffs['DragonBlood']) buffMultiplier += 0.3;
-        if (player.buffs['Concentrate']) buffMultiplier += 0.2;
-        if (player.buffs['Enrage']) buffMultiplier += 1.0;
-
-        let baseDamage = player.attack * (skillDef.damageMult || 1.0) * buffMultiplier;
-        baseDamage *= (1 + skillLevel * 0.1); 
-
-        switch(skillId) {
-            case 'PowerStrike':
-            case 'SlashBlast':
-            case 'Brandish':
-                SoundService.playAttack();
-                const hits = skillId === 'Brandish' ? 2 : 1;
-                for(let h=0; h<hits; h++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.direction === 1 ? player.x + player.width : player.x - (skillId === 'SlashBlast' ? 100 : 50),
-                            y: player.y + player.height / 2,
-                            width: skillId === 'SlashBlast' ? 150 : 50, height: 100,
-                            vx: player.direction * 2, vy: 0,
-                            damage: baseDamage, color: 'white', emoji: skillId === 'SlashBlast' ? '🌪️' : '⚔️',
-                            life: 15, isDead: false, isMagic: true, skillId: skillId
-                        });
-                    }, h * 100); // Faster checks
-                }
-                break;
-            case 'Rush':
-                player.vx = player.direction * 20;
-                player.invincibilityTimer = 30;
-                state.enemies.forEach(e => {
-                    if(!e.isDead && Math.abs(e.x - player.x) < 150) {
-                        e.vx = player.direction * 15;
-                        applyDamage(e, baseDamage, player.direction);
-                    }
-                });
-                break;
-            case 'Shout':
-            case 'GroundSmash':
-                SoundService.playMagicExplosion();
-                state.shakeTimer = 10;
-                createParticle(player.x, player.y - 20, "STUN!", "yellow", 60);
-                state.enemies.forEach(e => {
-                    if (!e.isDead && Math.abs(e.x - player.x) < (skillId === 'GroundSmash' ? 300 : 200)) {
-                        e.stunTimer = 180;
-                        applyDamage(e, baseDamage, 0);
-                    }
-                });
-                break;
-            case 'DragonBuster':
-                // Optimized Lancer: Less projectiles or instant damage
-                for(let i=0; i<3; i++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.x + player.direction * 50, y: player.y + 20,
-                            width: 60, height: 40, vx: player.direction * 10, vy: 0,
-                            damage: baseDamage, color: 'red', emoji: '🐉', life: 20, isDead: false, isMagic: true
-                        });
-                    }, i * 50); // Faster interval
-                }
-                break;
-            case 'DoubleStab':
-            case 'SpearCrusher':
-            case 'SpearPanic':
-                SoundService.playAttack();
-                const lhits = skillId === 'DoubleStab' ? 2 : 1;
-                for(let h=0; h<lhits; h++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.x + player.direction * 50, y: player.y + 30,
-                            width: skillId === 'SpearCrusher' ? 180 : 100, height: 40,
-                            vx: player.direction * 5, vy: 0,
-                            damage: baseDamage, color: 'yellow', emoji: '🔱',
-                            life: 20, isDead: false, isMagic: true
-                        });
-                    }, h * 80);
-                }
-                break;
-            case 'LeapAttack':
-                player.vy = -18;
-                player.vx = player.direction * 5;
-                setTimeout(() => {
-                    state.projectiles.push({
-                        id: Math.random().toString(),
-                        x: player.x, y: player.y + 50, width: 100, height: 100,
-                        vx: 0, vy: 15, damage: baseDamage, color: 'white', emoji: '⏬', life: 30, isDead: false, isMagic: true
-                    });
-                }, 300);
-                break;
-            case 'Guard':
-                player.invincibilityTimer = 180;
-                createParticle(player.x, player.y - 50, "SHIELD UP!", "#00ff00", 60);
-                SoundService.playEquip(); 
-                break;
-            case 'DragonRoar':
-            case 'Earthquake':
-                SoundService.playMagicExplosion();
-                state.shakeTimer = 10; // Reduced shake duration
-                state.enemies.forEach(e => {
-                    if(!e.isDead) {
-                        applyDamage(e, baseDamage, 0);
-                        if(skillId === 'Earthquake') e.vx = 0;
-                    }
-                });
-                break;
-            case 'Sacrifice':
-                player.hp = Math.max(1, player.hp - player.maxHp * 0.1);
-                createParticle(player.x, player.y, "-10% HP", "red");
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x + player.direction * 80, y: player.y, width: 50, height: 50,
-                    vx: player.direction * 15, vy: 0, damage: baseDamage, color: 'purple', emoji: '☠️', life: 40, isDead: false, isMagic: true
-                });
-                break;
-            case 'ArrowBlow':
-            case 'FireShot':
-            case 'IceShot':
-                SoundService.playAttack();
-                const emoji = skillId === 'FireShot' ? '🔥' : skillId === 'IceShot' ? '❄️' : '🏹';
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y + 30, width: 40, height: 20,
-                    vx: player.direction * 18, vy: 0,
-                    damage: baseDamage, color: 'white', emoji: emoji,
-                    life: 60, isDead: false, isMagic: true, rotation: player.direction===1?0:180,
-                    skillId: skillId 
-                });
-                break;
-            case 'MultiShot':
-            case 'Strafe':
-                const count = skillId === 'Strafe' ? 4 : 3;
-                for(let i = 0; i < count; i++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.x, y: player.y + 30, width: 30, height: 15,
-                            vx: player.direction * 18, vy: skillId==='Strafe' ? (Math.random()-0.5)*2 : (i-1)*2,
-                            damage: baseDamage, color: 'green', emoji: '➹',
-                            life: 60, isDead: false, isMagic: true, rotation: (player.direction===1?0:180) + (skillId==='Strafe'?0:(i-1)*15)
-                        });
-                    }, i * 30);
-                }
-                break;
-            case 'Backstep':
-                player.vx = -player.direction * 15;
-                player.vy = -5;
-                player.invincibilityTimer = 30;
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y + 30, width: 40, height: 15,
-                    vx: player.direction * 18, vy: 0,
-                    damage: baseDamage, color: 'white', emoji: '🏹',
-                    life: 60, isDead: false, isMagic: true, rotation: player.direction===1?0:180,
-                    skillId: skillId 
-                });
-                break;
-            case 'SnareTrap':
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y + 40, width: 30, height: 30,
-                    vx: 0, vy: 0, damage: baseDamage, color: 'brown', emoji: '🕸️',
-                    life: 600, isDead: false, isMagic: true, isTrap: true
-                });
-                break;
-            case 'ArrowRain':
-                for(let i=0; i<10; i++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.x + (Math.random()-0.5)*400, y: -200, width: 20, height: 60,
-                            vx: 0, vy: 20, damage: baseDamage, color: 'yellow', emoji: '⚡', life: 100, isDead: false, isMagic: true
-                        });
-                    }, i * 80);
-                }
-                break;
-            case 'Phoenix':
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y - 60, width: 40, height: 40,
-                    vx: 0, vy: 0, damage: baseDamage * 0.5, color: 'orange', emoji: '🦅',
-                    life: 1200, maxLife: 1200, isDead: false, isMagic: true, isSummon: true, summonTimer: 0
-                });
-                break;
-            case 'DoubleShot':
-            case 'RapidFire':
-                const rapidCount = skillId === 'RapidFire' ? 5 : 2;
-                for(let i=0; i<rapidCount; i++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.x + player.direction * 30, y: player.y + 30,
-                            width: 25, height: 25, vx: player.direction * 25, vy: (Math.random()-0.5),
-                            damage: baseDamage, color: 'orange', emoji: '🔴', life: 40, isDead: false, isMagic: true, rotation: player.direction===1?0:180
-                        });
-                        SoundService.playAttack();
-                    }, i * 40);
-                }
-                break;
-            case 'Grenade':
-            case 'C4':
-                const isC4 = skillId === 'C4';
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y + 20, width: 20, height: 20,
-                    vx: isC4 ? 0 : player.direction * 6,
-                    vy: isC4 ? 0 : -8,
-                    damage: baseDamage, color: 'black', emoji: isC4 ? '🧨' : '💣',
-                    life: isC4 ? 900 : 100, isDead: false, isMagic: true, 
-                    isTrap: isC4,
-                    explosive: !isC4
-                });
-                break;
-            case 'Flamethrower':
-                for(let i=0; i<5; i++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: player.x + player.direction * 40, y: player.y + 20 + (Math.random()-0.5)*20,
-                            width: 30, height: 30, vx: player.direction * 6, vy: (Math.random()-0.5)*2,
-                            damage: baseDamage, color: 'red', emoji: '🔥', life: 30, isDead: false, isMagic: true
-                        });
-                    }, i * 40);
-                }
-                break;
-            case 'IceSplitter':
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y + 25, width: 20, height: 20,
-                    vx: player.direction * 15, vy: 0, damage: baseDamage, color: 'blue', emoji: '🧊',
-                    life: 60, isDead: false, isMagic: true, skillId: 'IceShot' 
-                });
-                break;
-            case 'Turret':
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x + player.direction * 50, y: player.y + 20, width: 40, height: 40,
-                    vx: 0, vy: 0, damage: baseDamage * 0.8, color: 'gray', emoji: '🤖',
-                    life: 1800, maxLife: 1800, isDead: false, isMagic: true, isSummon: true, summonTimer: 0
-                });
-                break;
-            case 'AirStrike':
-            case 'HomingMissile':
-                const mCount = skillId === 'AirStrike' ? 8 : 3;
-                for(let i=0; i<mCount; i++) {
-                    setTimeout(() => {
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: skillId==='AirStrike' ? player.x + (Math.random()-0.5)*600 : player.x,
-                            y: skillId==='AirStrike' ? -300 : player.y - 50,
-                            width: 30, height: 60, vx: skillId==='HomingMissile' ? player.direction*10 : 0, vy: skillId==='HomingMissile' ? -5 : 20,
-                            damage: baseDamage, color: 'red', emoji: '🚀', life: 120, isDead: false, isMagic: true,
-                            explosive: skillId === 'AirStrike'
-                        });
-                    }, i * 100);
-                }
-                break;
-            case 'MagicClaw':
-            case 'FireBall':
-                SoundService.playMagicFireball();
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x + player.direction * 40, y: player.y + 20, width: 40, height: 40,
-                    vx: player.direction * 12, vy: 0, damage: baseDamage, color: 'purple', emoji: skillId==='FireBall'?'☄️':'🖐️',
-                    life: 60, isDead: false, isMagic: true
-                });
-                break;
-            case 'Thunderbolt':
-                state.shakeTimer = 8;
-                state.enemies.forEach(e => {
-                    if (!e.isDead && Math.abs(e.x - player.x) < 450) {
-                        createLightning(e.x + e.width/2, e.y + e.height/2);
-                        applyDamage(e, baseDamage, 0);
-                    }
-                });
-                break;
-            case 'ColdBeam':
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x + player.direction * 150, y: player.y - 100, width: 60, height: 200,
-                    vx: 0, vy: 0, damage: baseDamage, color: 'cyan', emoji: '❄️', life: 30, isDead: false, isMagic: true, skillId: 'IceShot'
-                });
-                break;
-            case 'Heal':
-                SoundService.playMagicIce();
-                player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.5);
-                createParticle(player.x, player.y - 40, "HEAL!", "green");
-                state.enemies.forEach(e => {
-                    if(!e.isDead && (e.type.includes('Zombie') || e.type.includes('Skeleton')) && Math.abs(e.x-player.x)<300) {
-                        applyDamage(e, baseDamage, 0);
-                    }
-                });
-                break;
-            case 'Teleport':
-                SoundService.playMagicThunder();
-                createParticle(player.x, player.y - 20, "Teleport!", "#00ffff", 30);
-                const targetX = Math.max(0, Math.min(state.worldWidth - player.width, mouseRef.current.x + state.cameraX));
-                const targetY = Math.max(0, Math.min(GROUND_Y + 100, mouseRef.current.y)); 
-                let finalY = targetY;
-                if (finalY > GROUND_Y - player.height) finalY = GROUND_Y - player.height;
-                player.x = targetX;
-                player.y = finalY;
-                player.vx = 0; player.vy = 0;
-                break;
-            case 'Slow':
-                state.enemies.forEach(e => {
-                    if (!e.isDead && Math.abs(e.x - player.x) < 400) {
-                        e.freezeTimer = 120;
-                        createParticle(e.x, e.y, "SLOW", "gray");
-                    }
-                });
-                break;
-            case 'Meteor':
-            case 'Blizzard':
-                SoundService.playMagicExplosion();
-                state.shakeTimer = 30;
-                const pEmoji = skillId === 'Meteor' ? '☄️' : '🧊';
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: (mouseRef.current.x + state.cameraX) - 100, y: -300, width: 200, height: 200,
-                    vx: 0, vy: 25, damage: baseDamage, color: skillId==='Meteor'?'red':'cyan', emoji: pEmoji,
-                    life: 200, isDead: false, isMagic: true, skillId: skillId==='Blizzard'?'IceShot':undefined
-                });
-                break;
-            case 'Bahamut':
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: player.x, y: player.y - 100, width: 80, height: 80,
-                    vx: 0, vy: 0, damage: baseDamage, color: 'gold', emoji: '🐉',
-                    life: 1800, maxLife: 1800, isDead: false, isMagic: true, isSummon: true, summonTimer: 0
-                });
-                break;
-
-            default:
-                createParticle(player.x, player.y, "?", "white");
-        }
-        
-        forceUIUpdate();
-    };
-
-    const applyDamage = (enemy: Enemy, rawDamage: number, direction: number, scale = 1.0) => {
-        const player = gameState.current.player;
-        const damage = Math.floor(rawDamage * (0.8 + Math.random() * 0.4));
-        
-        const baseCritChance = 0.2;
-        const sharpEyesLevel = player.skills['SharpEyes'] || 0;
-        let critChance = baseCritChance + (sharpEyesLevel * 0.05);
-        if(player.buffs['Concentrate']) critChance += 0.2;
-        if(player.buffs['SharpEyes']) critChance += 0.2;
-
-        const isCrit = Math.random() < critChance;
-        const finalDamage = isCrit ? damage * 2 : damage;
-        
-        enemy.hp -= finalDamage;
-        if (!enemy.isBoss && enemy.freezeTimer <= 0 && enemy.stunTimer <= 0) {
-             if (direction !== 0) {
-                 enemy.vx = direction * 6;
-                 enemy.vy = -3;
-             } else {
-                 enemy.vy = 5; 
-             }
-        }
-        
-        const vampLevel = player.skills['Vampirism'] || 0;
-        if (vampLevel > 0 && Math.random() < (vampLevel * 0.05)) {
-            if (player.hp < player.maxHp) {
-                player.hp = Math.min(player.maxHp, player.hp + 5);
-                createParticle(player.x, player.y - 30, "+5 HP", "#ff0000");
-            }
-        }
-        
-        SoundService.playEnemyHit();
-        createParticle(enemy.x, enemy.y, finalDamage.toString(), isCrit ? '#ff00ff' : '#ffff00', 60, scale);
-        
-        if (enemy.hp <= 0 && !enemy.isDead) {
-            enemy.isDead = true;
-            const wisdomLevel = player.skills['Wisdom'] || 0;
-            const expGain = Math.floor(enemy.expValue * (1 + wisdomLevel * 0.05));
-            gameState.current.player.exp += expGain;
-            latestProps.current.onEventLog(`${enemy.type} 처치! +${expGain} EXP`);
-            
-            while (gameState.current.player.exp >= gameState.current.player.maxExp) {
-                 checkLevelUp(gameState.current.player);
-            }
-            
-            gameState.current.shakeTimer = enemy.isBoss ? 20 : 5; 
-            
-            const currentQuest = latestProps.current.currentQuest;
-            if (currentQuest && !currentQuest.isCompleted) {
-                const baseType = enemy.type.replace('Giant ', '') as keyof typeof ENEMY_TYPES;
-                if (baseType === currentQuest.targetMonster) {
-                    const dropInfo = ENEMY_TYPES[baseType];
-                    if (dropInfo) {
-                        spawnItem(enemy.x, enemy.y, 'QuestItem', undefined, dropInfo.dropName, dropInfo.dropEmoji);
-                        latestProps.current.onEventLog(`✨ ${dropInfo.dropName} 발견!`);
-                    }
-                }
-            }
-
-            if (!enemy.isBoss) spawnItem(enemy.x, enemy.y);
-            
-            if (enemy.isBoss) {
-                const goldCoins = 5 + Math.floor(Math.random() * 4);
-                for(let i=0; i<goldCoins; i++) {
-                     const val = 100 + Math.floor(Math.random() * 400);
-                     spawnItem(enemy.x + (Math.random()-0.5)*150, enemy.y - 50, 'Gold', undefined, undefined, undefined, val);
-                }
-                spawnItem(enemy.x + (Math.random()-0.5)*50, enemy.y, 'HpPotion');
-                spawnItem(enemy.x + (Math.random()-0.5)*50, enemy.y, 'MpPotion');
-                
-                const allWeapons: WeaponType[] = ['Sword', 'Spear', 'Bow', 'Gun'];
-                if(player.isAdvanced) {
-                    allWeapons.push('Greatsword', 'Polearm', 'Crossbow', 'Cannon', 'Staff');
-                }
-                
-                const locked = allWeapons.find(w => !player.unlockedWeapons.includes(w));
-                if (locked) spawnItem(enemy.x, enemy.y - 80, 'Weapon', locked);
-
-                latestProps.current.onEventLog("보스를 물리쳤습니다! 막대한 보상 획득!");
-                createParticle(enemy.x, enemy.y - 100, "JACKPOT!!", "#ffd700", 200);
-            }
-
-            if (Math.random() < 0.2) {
-               // Use sync chat generation to avoid lag
-               const text = generateChat(enemy.type);
-               createParticle(enemy.x, enemy.y - 40, text, '#fff', 90);
-            }
-        }
-    };
-
-    const checkLevelUp = (player: Player) => {
-        if (player.exp >= player.maxExp) {
-            player.level++;
-            player.sp += 3;
-            player.exp -= player.maxExp;
-            player.maxExp = LEVELS_EXP[player.level] || player.maxExp * 1.5;
-            player.maxHp += 20; player.maxMp += 10;
-            player.hp = player.maxHp; player.mp = player.maxMp;
-            player.attack += 5;
-            SoundService.playLevelUp();
-            createParticle(player.x, player.y - 50, "LEVEL UP!", "#00ffff", 150);
-            createParticle(player.x, player.y - 80, "+3 SP", "#ffff00", 150);
-            latestProps.current.onEventLog(`레벨 ${player.level} 달성! (SP +3)`);
-        }
-    };
-
-    const update = () => {
-        if (!gameActive) return;
-        const state = gameState.current;
-        const player = state.player;
-
-        if (player.isDead) return;
-
-        for (const buffId in player.buffs) {
-            player.buffs[buffId]--;
-            if (player.buffs[buffId] <= 0) {
-                delete player.buffs[buffId];
-                latestProps.current.onEventLog(`${buffId} 효과가 끝났습니다.`);
-            }
-        }
-
-        const hasteLevel = player.skills['Haste'] || 0;
-        let speedMult = 1 + hasteLevel * 0.05;
-        if (player.buffs['Dash']) speedMult += 0.5; 
-        const maxSpeed = MOVE_SPEED * speedMult;
-
-        if (keysPressed.current.has(latestProps.current.keyBindings.RIGHT)) {
-            player.vx += 1;
-            player.direction = Direction.RIGHT;
-        } else if (keysPressed.current.has(latestProps.current.keyBindings.LEFT)) {
-            player.vx -= 1;
-            player.direction = Direction.LEFT;
-        } else {
-            player.vx *= FRICTION;
-        }
-        
-        if (player.vx > maxSpeed * 2) player.vx *= 0.9;
-        else {
-            if (player.vx > maxSpeed) player.vx = maxSpeed;
-            if (player.vx < -maxSpeed) player.vx = -maxSpeed;
-        }
-        if (Math.abs(player.vx) < 0.1) player.vx = 0;
-
-        player.x += player.vx;
-        if (player.x < 0) player.x = 0;
-        
-        player.vy += GRAVITY;
-        player.y += player.vy;
-
-        let onGround = false;
-        state.platforms.forEach(plat => {
-            if (player.x + player.width > plat.x && player.x < plat.x + plat.width) {
-                if (player.vy >= 0 && 
-                    player.y + player.height >= plat.y && 
-                    player.y + player.height - player.vy <= plat.y + 10) { 
-                    
-                    player.y = plat.y - player.height;
-                    player.vy = 0;
-                    onGround = true;
-                    player.jumps = 0; 
-                }
-            }
-        });
-
-        if (player.y > GROUND_Y + 100) { 
-            player.hp = 0;
-            player.isDead = true;
-            SoundService.playHit();
-            latestProps.current.onGameOver();
-        }
-
-        const bossAlive = state.enemies.some(e => e.isBoss && !e.isDead);
-        if (player.x > state.worldWidth - 50) {
-            if (bossAlive) {
-                player.x = state.worldWidth - 50;
-                if (state.shakeTimer <= 0 && Math.random() < 0.05) {
-                    latestProps.current.onEventLog("🔒 보스를 처치해야 이동할 수 있습니다!");
-                }
-            } else {
-                if (state.stageLevel < 99) loadStage(state.stageLevel + 1);
-            }
-        }
-
-        if (player.attackCooldown > 0) player.attackCooldown--;
-        else {
-            player.isAttacking = false;
-            player.isDownAttacking = false; 
-        }
-        if (player.invincibilityTimer > 0) player.invincibilityTimer--;
-        
-        for (const skillId in player.cooldowns) {
-            if (player.cooldowns[skillId] > 0) player.cooldowns[skillId]--;
-        }
-
-        let mpRegenChance = 0.05;
-        if(player.skills['MPRestore']) mpRegenChance += 0.05 * player.skills['MPRestore'];
-        if (Math.random() < mpRegenChance && player.mp < player.maxMp) player.mp += 1;
-
-        // Items Update
-        state.items.forEach(item => {
-            item.vy += GRAVITY;
-            item.x += item.vx;
-            item.y += item.vy;
-            if (item.y + item.height > GROUND_Y) {
-                item.y = GROUND_Y - item.height;
-                item.vy = -item.vy * 0.5; 
-                item.vx *= 0.9;
-            }
-            item.life--;
-            
-            const dist = Math.abs(player.x - item.x);
-            if (dist < 150) item.x += (player.x - item.x) * 0.05;
-
-            if (checkCollision(player, item)) {
-                 item.life = 0; 
-                 if (item.type === 'Gold') {
-                     let val = item.value;
-                     const greedLevel = player.skills['Greed'] || 0;
-                     if(greedLevel>0) val = Math.floor(val * (1+greedLevel*0.1));
-                     player.gold += val;
-                     SoundService.playCoin();
-                     createParticle(player.x, player.y - 20, `+${val}G`, '#ffd700');
-                 } else if (item.type === 'HpPotion' || item.type === 'MpPotion') {
-                     if(item.type === 'HpPotion') player.hpPotions++; else player.mpPotions++;
-                     SoundService.playCoin();
-                     createParticle(player.x, player.y - 20, `+1 ${item.type}`, item.type==='HpPotion'?'red':'blue');
-                 } else if (item.type === 'Weapon' && item.weaponType) {
-                     if (!player.unlockedWeapons.includes(item.weaponType)) {
-                         player.unlockedWeapons.push(item.weaponType);
-                         player.currentWeapon = item.weaponType;
-                         SoundService.playEquip();
-                         createParticle(player.x, player.y - 50, `${item.weaponType} UNLOCKED!`, '#ffffff', 180);
-                     }
-                 } else if (item.type === 'QuestItem') {
-                     const { currentQuest, onQuestUpdate, onQuestComplete, onEventLog } = latestProps.current;
-                     SoundService.playCoin();
-                     createParticle(player.x, player.y - 40, `${item.questItemName} +1`, '#00ff00', 90);
-                     if (currentQuest && !currentQuest.isCompleted) {
-                         const newCount = Math.min(currentQuest.targetCount, currentQuest.currentCount + 1);
-                         onQuestUpdate(newCount);
-                         if (newCount >= currentQuest.targetCount) {
-                             const rewardExp = currentQuest.rewardExp;
-                             player.exp += rewardExp;
-                             player.gold += Math.floor(rewardExp/2);
-                             onQuestComplete(rewardExp, Math.floor(rewardExp/2));
-                             onEventLog("🎉 퀘스트 완료!");
-                             createParticle(player.x, player.y - 80, "QUEST COMPLETE!", "#ffff00", 200);
-                         }
-                     }
-                 }
-            }
-        });
-        state.items = state.items.filter(i => i.life > 0);
-
-        state.lightnings.forEach(l => l.life--);
-        state.lightnings = state.lightnings.filter(l => l.life > 0);
-
-        state.projectiles.forEach(p => {
-            if (!p.isTrap && !p.isSummon) {
-                p.x += p.vx;
-                p.y += p.vy;
-            }
-            
-            if (p.isSummon) {
-                const targetX = player.x + (player.direction * -50);
-                const targetY = player.y - 80;
-                p.x += (targetX - p.x) * 0.05;
-                p.y += (targetY - p.y) * 0.05;
-                
-                if (p.summonTimer !== undefined) p.summonTimer++;
-                if (p.summonTimer && p.summonTimer > 60) {
-                    p.summonTimer = 0;
-                    const target = state.enemies.find(e => !e.isDead && Math.abs(e.x - p.x) < 400);
-                    if (target) {
-                        const angle = Math.atan2(target.y - p.y, target.x - p.x);
-                        state.projectiles.push({
-                            id: Math.random().toString(),
-                            x: p.x, y: p.y, width: 15, height: 15,
-                            vx: Math.cos(angle) * 10, vy: Math.sin(angle) * 10,
-                            damage: p.damage, color: 'orange', emoji: '🔥', life: 60, isDead: false, isMagic: true
-                        });
-                    }
-                }
-            }
-
-            if (p.trail) p.trail.unshift({x: p.x + p.width/2, y: p.y + p.height/2, alpha: 1.0});
-            if (p.trail && p.trail.length > 15) p.trail.pop();
-            p.trail?.forEach(t => t.alpha -= 0.05);
-            
-            if (p.emoji === '💣' || p.emoji === '⏬' || p.emoji === '🧨') { 
-                p.vy += 0.2; 
-            }
-            
-            if (p.rotation !== undefined && p.rotationSpeed) {
-                p.rotation += p.rotationSpeed;
-            } else if (p.emoji === '➹' || p.emoji === '➵') {
-                p.rotation = Math.atan2(p.vy, p.vx) * 180 / Math.PI;
-            }
-
-            p.life--;
-            if (p.life <= 0) {
-                p.isDead = true;
-                if (p.explosive) {
-                    createParticle(p.x, p.y, "BOOM!", "orange", 60);
-                    state.shakeTimer = 15;
-                    SoundService.playMagicExplosion();
-                    state.enemies.forEach(e => {
-                        if (!e.isDead && Math.abs(e.x - p.x) < 150 && Math.abs(e.y - p.y) < 150) {
-                            applyDamage(e, p.damage, 0);
-                        }
-                    });
-                }
-            }
-
-            if (p.explosive && p.y + p.height >= GROUND_Y) {
-                p.life = 0; 
-            }
-            
-            if (p.isTrap && p.y + p.height >= GROUND_Y) {
-                p.y = GROUND_Y - p.height;
-                p.vy = 0;
-                p.vx = 0;
-            }
-
-            if (!p.isEnemy && p.width > 150 && p.y >= GROUND_Y - 100) { 
-                createParticle(p.x + p.width/2, p.y + p.height, "BOOM!!", "red", 50);
-                state.shakeTimer = 50; 
-                SoundService.playMagicExplosion();
-                p.isDead = true;
-                state.enemies.forEach(e => {
-                    if (!e.isDead) applyDamage(e, p.damage, 0);
-                    if (p.skillId === 'IceShot') e.freezeTimer = 180;
-                });
-            }
-
-            if (p.isEnemy) {
-                if (checkCollision(p, player) && !player.isDead && player.invincibilityTimer <= 0) {
-                    p.isDead = true;
-                    const stoneSkinLevel = player.skills['StoneSkin'] || 0;
-                    let damageReduction = 1 - (stoneSkinLevel * 0.03); 
-                    if(player.buffs['IronWall']) damageReduction -= 0.2;
-                    const rawDmg = p.damage * Math.max(0.1, damageReduction);
-                    let actualDamage = Math.max(1, Math.floor(rawDmg));
-                    
-                    if (player.shield > 0) {
-                        if (player.shield >= actualDamage) {
-                            player.shield -= actualDamage;
-                            actualDamage = 0;
-                            createParticle(player.x, player.y - 20, "BLOCK", "#aaaaaa");
-                        } else {
-                            actualDamage -= player.shield;
-                            player.shield = 0;
-                        }
-                    }
-
-                    if (actualDamage > 0) {
-                        player.hp -= actualDamage;
-                        player.invincibilityTimer = 60;
-                        createParticle(player.x, player.y, `-${actualDamage}`, '#ff0000');
-                        state.shakeTimer = 5;
-                        SoundService.playHit();
-                        if (player.hp <= 0) {
-                            player.isDead = true;
-                            latestProps.current.onGameOver();
-                        }
-                    }
-                }
-            } else {
-                state.enemies.forEach(e => {
-                    if (!e.isDead && checkCollision(p, e)) {
-                        if (p.isTrap) {
-                            p.isDead = true;
-                            createParticle(p.x, p.y, "BOOM!", "red", 60);
-                            state.shakeTimer = 10;
-                            SoundService.playMagicExplosion();
-                            applyDamage(e, p.damage * 2, 0);
-                            if (p.skillId === 'SnareTrap') e.freezeTimer = 120;
-                        } else if (p.explosive) {
-                            p.isDead = true; 
-                            createParticle(p.x, p.y, "BOOM!", "orange", 60);
-                            state.shakeTimer = 15;
-                            SoundService.playMagicExplosion();
-                            state.enemies.forEach(subE => {
-                                if(!subE.isDead && Math.abs(subE.x - p.x) < 150 && Math.abs(subE.y - p.y) < 150) {
-                                    applyDamage(subE, p.damage, p.vx > 0 ? 1 : -1);
-                                }
-                            });
-                        } else if (!p.isSummon) { 
-                            if (!p.piercing && p.width <= 150) p.isDead = true; 
-                            
-                            let damageMod = 1.0;
-                            const dist = Math.abs(player.x - e.x);
-                            
-                            if (p.weaponType === 'Bow' || p.weaponType === 'Crossbow') {
-                                if (dist < 200) damageMod = 0.6; 
-                                else if (dist >= 200 && dist < 500) damageMod = 1.2; 
-                            } else if (p.weaponType === 'Gun' || p.weaponType === 'Cannon') {
-                                if (dist < 250) damageMod = 1.2; 
-                                else if (dist > 500) damageMod = 0.8; 
-                            }
-                            
-                            applyDamage(e, p.damage * damageMod, p.vx > 0 ? 1 : -1, damageMod);
-                            if (p.skillId === 'IceShot' || p.skillId === 'ColdBeam') e.freezeTimer = 120;
-                        }
-                    }
-                });
-            }
-        });
-        state.projectiles = state.projectiles.filter(p => !p.isDead);
-
-        let boss: Enemy | null = null;
-        state.enemies.forEach(enemy => {
-            if (enemy.isDead) return;
-            if (enemy.isBoss) boss = enemy;
-            
-            if (enemy.freezeTimer > 0) {
-                enemy.freezeTimer--;
-                if(Math.random() < 0.1) createParticle(enemy.x, enemy.y, "🧊", "cyan", 20);
-                return;
-            }
-            if (enemy.stunTimer > 0) {
-                enemy.stunTimer--;
-                if(Math.random() < 0.1) createParticle(enemy.x, enemy.y, "💫", "yellow", 20);
-                return;
-            }
-
-            const dist = Math.abs(player.x - enemy.x);
-            const canSeePlayer = Math.abs(player.y - enemy.y) < 100;
-
-            if (enemy.isRanged && dist < 400 && canSeePlayer && enemy.attackTimer <= 0) {
-                enemy.attackTimer = 180;
-                const config = ENEMY_TYPES[enemy.type.replace('Giant ', '') as keyof typeof ENEMY_TYPES];
-                const projectileEmoji = (config as any).projectile || '🔴';
-                
-                state.projectiles.push({
-                    id: Math.random().toString(),
-                    x: enemy.x + enemy.width/2,
-                    y: enemy.y + enemy.height/2,
-                    width: 20, height: 20,
-                    vx: (player.x > enemy.x ? 1 : -1) * 7,
-                    vy: 0,
-                    damage: enemy.damage,
-                    color: 'red',
-                    emoji: projectileEmoji,
-                    life: 100, isDead: false, isMagic: false, isEnemy: true
-                });
-                enemy.vx = 0;
-            } else {
-                if (enemy.attackTimer > 0) enemy.attackTimer--;
-                if (dist < 400 || enemy.isBoss) {
-                    if (player.x > enemy.x) enemy.direction = Direction.RIGHT; else enemy.direction = Direction.LEFT;
-                } else {
-                    if (enemy.x > enemy.patrolEnd) enemy.direction = Direction.LEFT;
-                    if (enemy.x < enemy.patrolStart) enemy.direction = Direction.RIGHT;
-                }
-                enemy.vx = enemy.direction * (ENEMY_TYPES[enemy.type.replace('Giant ', '') as keyof typeof ENEMY_TYPES]?.speed || 1);
-                if (enemy.isBoss) enemy.vx *= 0.7;
-                enemy.x += enemy.vx;
-            }
-            
-            enemy.vy += GRAVITY;
-            enemy.y += enemy.vy;
-            
-            state.platforms.forEach(plat => {
-                 if (enemy.vy >= 0 && enemy.y + enemy.height >= plat.y && enemy.y + enemy.height - enemy.vy <= plat.y + 10 &&
-                     enemy.x + enemy.width > plat.x && enemy.x < plat.x + plat.width) {
-                     enemy.y = plat.y - enemy.height;
-                     enemy.vy = 0;
-                 }
-            });
-
-            if (checkCollision(player, enemy) && !enemy.isDead) {
-                if (player.invincibilityTimer <= 0) {
-                    const evasionLevel = player.skills['Evasion'] || 0;
-                    let dodgeChance = evasionLevel * 0.03;
-                    if(player.buffs['Concentrate']) dodgeChance += 0.2;
-
-                    if (Math.random() < dodgeChance) {
-                        createParticle(player.x, player.y - 20, "MISS", "#888888");
-                        return;
-                    }
-
-                    const stoneSkinLevel = player.skills['StoneSkin'] || 0;
-                    let damageReduction = 1 - (stoneSkinLevel * 0.03); 
-                    if(player.buffs['IronWall']) damageReduction -= 0.2;
-                    if(player.buffs['Battleship']) damageReduction -= 0.3;
-
-                    const rawDmg = enemy.damage * Math.max(0.1, damageReduction);
-                    let actualDamage = Math.max(1, Math.floor(rawDmg));
-
-                    const magicGuardLevel = player.skills['MagicGuard'] || 0;
-                    if (magicGuardLevel > 0 && player.mp > actualDamage * 0.5) {
-                        const mpDmg = Math.floor(actualDamage * 0.8);
-                        player.mp -= mpDmg;
-                        actualDamage -= mpDmg;
-                        createParticle(player.x, player.y - 40, `-${mpDmg} MP`, "blue");
-                    }
-                    
-                    if (player.shield > 0) {
-                        if (player.shield >= actualDamage) {
-                            player.shield -= actualDamage;
-                            actualDamage = 0;
-                            createParticle(player.x, player.y - 20, "BLOCK", "#aaaaaa");
-                        } else {
-                            actualDamage -= player.shield;
-                            player.shield = 0;
-                        }
-                    }
-
-                    const reflectLevel = player.skills['PowerGuard'] || 0;
-                    if (reflectLevel > 0) {
-                        const reflectDmg = actualDamage * (0.2 + reflectLevel * 0.05);
-                        applyDamage(enemy, reflectDmg, 0);
-                        createParticle(enemy.x, enemy.y, `Reflect ${Math.floor(reflectDmg)}`, "orange");
-                    }
-
-                    if (actualDamage > 0) {
-                        player.hp -= actualDamage;
-                        player.vx = enemy.direction === Direction.RIGHT ? 8 : -8;
-                        player.vy = -5;
-                        player.invincibilityTimer = 60;
-                        createParticle(player.x, player.y, `-${actualDamage}`, '#ff0000');
-                        state.shakeTimer = 5;
-                        SoundService.playHit();
-                        if (player.hp <= 0) {
-                            player.isDead = true;
-                            latestProps.current.onGameOver();
-                        }
-                    }
-                }
-            }
-        });
-        state.enemies = state.enemies.filter(e => !e.isDead);
-
-        if (state.enemies.length < 5 + state.stageLevel && !state.enemies.some(e => e.isBoss)) {
-            if(Math.random() < 0.02) {
-                 const allowedMonsters = Object.entries(ENEMY_TYPES).filter(([key, _]) => {
-                    if (state.biomeIndex === 0) return ['Snail', 'Slime', 'Mushroom', 'Boar'].includes(key);
-                    return true;
-                 }).map(([key]) => key);
-                 const type = allowedMonsters[Math.floor(Math.random() * allowedMonsters.length)] || 'Slime';
-                 spawnEnemy(Math.random() * state.worldWidth, type as any);
-            }
-        }
-
-        const targetCamX = player.x - VIEWPORT_WIDTH / 2 + player.width / 2;
-        state.cameraX += (targetCamX - state.cameraX) * 0.1;
-        if (state.cameraX < 0) state.cameraX = 0;
-        if (state.cameraX > state.worldWidth - VIEWPORT_WIDTH) state.cameraX = state.worldWidth - VIEWPORT_WIDTH;
-
-        state.particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life--; });
-        state.particles = state.particles.filter(p => p.life > 0);
-
-        const biome = BIOMES[state.biomeIndex];
-        onStatsUpdate({ ...player }, boss, state.stageLevel, biome.name);
-    };
-
-    const draw = (ctx: CanvasRenderingContext2D) => {
-        const state = gameState.current;
-        const width = ctx.canvas.width;
-        const height = ctx.canvas.height;
-        
-        const biome = BIOMES[state.biomeIndex] || BIOMES[0];
-        
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, biome.sky[0]);
-        gradient.addColorStop(1, biome.sky[1]);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-
-        if (bgImageRef.current) {
-             ctx.drawImage(bgImageRef.current, 0, 0, width, height);
-        }
-
-        ctx.save();
-        
-        if (state.shakeTimer > 0) {
-            const shake = (Math.random() - 0.5) * 10;
-            ctx.translate(shake, shake);
-            state.shakeTimer--;
-        }
-        
-        ctx.translate(-state.cameraX, 0);
-
-        ctx.fillStyle = biome.ground;
-        state.platforms.forEach(p => {
-            ctx.fillRect(p.x, p.y, p.width, p.height);
-            ctx.fillStyle = biome.top;
-            ctx.fillRect(p.x, p.y, p.width, 10);
-            ctx.fillStyle = biome.ground;
-        });
-
-        ctx.font = '24px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        state.items.forEach(item => {
-             ctx.fillText(item.emoji, item.x + 15, item.y + 15);
-             if(item.type === 'Weapon') {
-                 ctx.shadowColor = 'white';
-                 ctx.shadowBlur = 10;
-                 ctx.fillText(item.emoji, item.x + 15, item.y + 15);
-                 ctx.shadowBlur = 0;
-             }
-        });
-
-        state.enemies.forEach(enemy => {
-            if(enemy.isDead) return;
-            
-            ctx.save();
-            ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
-            if(enemy.direction === Direction.LEFT) ctx.scale(-1, 1);
-            
-            const fontSize = enemy.isBoss ? 80 : 40;
-            ctx.font = `${fontSize}px serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            ctx.fillText(enemy.emoji, 0, 0);
-            
-            if(enemy.freezeTimer > 0) {
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-                ctx.beginPath();
-                ctx.arc(0, 0, enemy.width/1.5, 0, Math.PI*2);
-                ctx.fill();
-            }
-            
-            if(enemy.stunTimer > 0) {
-                 ctx.font = '20px serif';
-                 ctx.fillText("💫", 0, -enemy.height/2 - 10);
-            }
-
-            ctx.restore();
-
-            if (!enemy.isBoss) {
-                const hpPct = enemy.hp / enemy.maxHp;
-                ctx.fillStyle = 'red';
-                ctx.fillRect(enemy.x, enemy.y - 10, enemy.width, 5);
-                ctx.fillStyle = '#00ff00';
-                ctx.fillRect(enemy.x, enemy.y - 10, enemy.width * hpPct, 5);
-            }
-        });
-
-        // Player Drawing
-        const player = state.player;
-        if (!player.isDead) {
-             ctx.save();
-             ctx.translate(player.x + player.width/2, player.y + player.height/2);
-             
-             // Handle direction flipping
-             if (player.direction === Direction.LEFT) ctx.scale(-1, 1);
-             
-             // Invincibility flicker
-             if (player.invincibilityTimer > 0) ctx.globalAlpha = 0.5 + Math.sin(Date.now()/50)*0.4;
-
-             // Draw Player Emoji
-             ctx.font = '40px serif';
-             ctx.textAlign = 'center';
-             ctx.textBaseline = 'middle';
-             
-             // Bounce effect while moving
-             const isMoving = Math.abs(player.vx) > 0.1;
-             const bounce = isMoving ? Math.sin(Date.now() / 100) * 5 : 0;
-             
-             ctx.fillText(player.emoji, 0, bounce);
-
-             // Draw Weapon
-             const weapon = WEAPONS[player.currentWeapon];
-             if(weapon) {
-                 ctx.save();
-                 // Position weapon relative to player
-                 ctx.translate(15, 5 + bounce); 
-                 
-                 // Attack animation
-                 if(player.isAttacking) {
-                     ctx.rotate(Math.PI / 4);
-                     ctx.translate(10, -10);
-                 } else if (player.isDownAttacking) {
-                     ctx.rotate(Math.PI / 2);
-                     ctx.translate(0, 20);
-                 }
-                 
-                 ctx.font = '30px serif';
-                 ctx.fillText(weapon.emoji, 0, 0);
-                 ctx.restore();
-             }
-
-             ctx.restore();
-        }
-
-        state.projectiles.forEach(p => {
-            ctx.save();
-            ctx.translate(p.x + p.width/2, p.y + p.height/2);
-            if (p.isSummon && (p.emoji === '🦅' || p.emoji === '🐉')) {
-                if (state.player.direction === Direction.RIGHT) ctx.scale(-1, 1);
-            }
-            if (p.rotation) ctx.rotate(p.rotation * Math.PI / 180);
-            const baseSize = Math.max(30, p.width);
-            ctx.font = `${baseSize}px serif`;
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(p.emoji, 0, 0);
-            ctx.restore();
-        });
-
-        state.lightnings.forEach(l => {
-             ctx.strokeStyle = l.color;
-             ctx.lineWidth = l.width;
-             ctx.beginPath();
-             if(l.points.length > 0) ctx.moveTo(l.points[0].x, l.points[0].y);
-             for(let i=1; i<l.points.length; i++) ctx.lineTo(l.points[i].x, l.points[i].y);
-             ctx.stroke();
-        });
-
-        state.particles.forEach(p => {
-            ctx.save();
-            ctx.globalAlpha = p.life / p.maxLife;
-            ctx.fillStyle = p.color;
-            ctx.font = `bold ${20 * (p.scale || 1)}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 2;
-            ctx.strokeText(p.text, p.x, p.y);
-            ctx.fillText(p.text, p.x, p.y);
-            ctx.restore();
-        });
-        
-        ctx.restore();
-    };
-
-    const tick = () => {
-        update();
-        if (canvasRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) draw(ctx);
-        }
-        requestRef.current = requestAnimationFrame(tick);
-    };
-
-    useEffect(() => {
-        requestRef.current = requestAnimationFrame(tick);
-        return () => {
-            if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
-        };
-    }, [gameActive]);
-
+    // Input Handling
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            const isControlKey = Object.values(latestProps.current.keyBindings).includes(e.code);
-            if (isControlKey && gameActive) {
-                keysPressed.current.add(e.code);
+            if (!gameActive) return;
+            keysPressed.current.add(e.code);
+            
+            const player = state.current.player;
+            if (player && !player.isDead) {
+                if (e.code === keyBindings.POTION_HP) usePotion('HP');
+                if (e.code === keyBindings.POTION_MP) usePotion('MP');
+                if (e.code === keyBindings.SKILL_1) useSkill(player.skillSlots[keyBindings.SKILL_1]);
+                if (e.code === keyBindings.SKILL_2) useSkill(player.skillSlots[keyBindings.SKILL_2]);
+                if (e.code === keyBindings.SKILL_3) useSkill(player.skillSlots[keyBindings.SKILL_3]);
+                if (e.code === keyBindings.SKILL_4) useSkill(player.skillSlots[keyBindings.SKILL_4]);
+                if (e.code === keyBindings.SKILL_5) useSkill(player.skillSlots[keyBindings.SKILL_5]);
+                
+                if (e.code === keyBindings.WEAPON_1 && player.unlockedWeapons[0]) switchWeapon(player.unlockedWeapons[0]);
+                if (e.code === keyBindings.WEAPON_2 && player.unlockedWeapons[1]) switchWeapon(player.unlockedWeapons[1]);
+                if (e.code === keyBindings.WEAPON_3 && player.unlockedWeapons[2]) switchWeapon(player.unlockedWeapons[2]);
+                if (e.code === keyBindings.WEAPON_4 && player.unlockedWeapons[3]) switchWeapon(player.unlockedWeapons[3]);
             }
+        };
 
-            if (gameActive) {
-                const binds = latestProps.current.keyBindings;
-                if (e.code === binds.ATTACK) attemptAttack();
-                if (e.code === binds.POTION_HP) usePotion('HP');
-                if (e.code === binds.POTION_MP) usePotion('MP');
-                if (e.code === binds.JUMP) {
-                    const player = gameState.current.player;
-                    const canDoubleJump = (player.skills['DoubleJump'] || 0) > 0;
-                    const limit = canDoubleJump ? 2 : 1;
-                    if (player.jumps < limit) {
-                        player.vy = JUMP_FORCE;
-                        player.jumps++;
-                        SoundService.playJump();
-                        if (player.jumps > 1) {
-                            createParticle(player.x, player.y + 40, "Double Jump!", "#ffffff", 40);
-                        }
-                    }
-                }
-                if (e.code === binds.SKILL_1) useActiveSkill(binds.SKILL_1);
-                if (e.code === binds.SKILL_2) useActiveSkill(binds.SKILL_2);
-                if (e.code === binds.SKILL_3) useActiveSkill(binds.SKILL_3);
-                if (e.code === binds.SKILL_4) useActiveSkill(binds.SKILL_4);
-                if (e.code === binds.SKILL_5) useActiveSkill(binds.SKILL_5);
-            }
-        };
-        const handleKeyUp = (e: KeyboardEvent) => keysPressed.current.delete(e.code);
-        
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!canvasRef.current) return;
-            const rect = canvasRef.current.getBoundingClientRect();
-            mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        };
-        const handleMouseDown = () => { if(gameActive) attemptAttack(); };
-        
-        const handleBlur = () => {
-            keysPressed.current.clear();
+        const handleKeyUp = (e: KeyboardEvent) => {
+            keysPressed.current.delete(e.code);
         };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mousedown', handleMouseDown);
-        window.addEventListener('blur', handleBlur); 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mousedown', handleMouseDown);
-            window.removeEventListener('blur', handleBlur);
         };
-    }, [gameActive]);
+    }, [gameActive, keyBindings]);
 
-    return <canvas ref={canvasRef} width={VIEWPORT_WIDTH} height={VIEWPORT_HEIGHT} className="bg-blue-200 shadow-xl rounded-lg cursor-crosshair" />;
+    // --- Logic Helpers ---
+
+    const usePotion = (type: 'HP' | 'MP') => {
+        const p = state.current.player;
+        if (type === 'HP' && p.hpPotions > 0 && p.hp < p.maxHp) {
+            p.hpPotions--;
+            heal(50);
+            SoundService.playDrink();
+        } else if (type === 'MP' && p.mpPotions > 0 && p.mp < p.maxMp) {
+            p.mpPotions--;
+            restoreMp(50);
+            SoundService.playDrink();
+        }
+    };
+
+    const heal = (amount: number) => {
+        const p = state.current.player;
+        p.hp = Math.min(p.hp + amount, p.maxHp);
+        spawnDamageNumber(p.x, p.y, `+${amount}`, 'green');
+    };
+    
+    const restoreMp = (amount: number) => {
+        const p = state.current.player;
+        p.mp = Math.min(p.mp + amount, p.maxMp);
+    };
+
+    const switchWeapon = (weapon: WeaponType) => {
+        const p = state.current.player;
+        if (p.unlockedWeapons.includes(weapon)) {
+            p.currentWeapon = weapon;
+            SoundService.playEquip();
+            onEventLog(`무기 변경: ${WEAPONS[weapon].emoji}`);
+        }
+    };
+
+    const useSkill = (skillId: string) => {
+        const p = state.current.player;
+        if (!skillId || p.isDead) return;
+        
+        const skill = SKILL_TREE.find(s => s.id === skillId);
+        if (!skill) return;
+
+        if ((p.cooldowns[skillId] || 0) > 0) {
+            onEventLog("아직 사용할 수 없습니다.");
+            return;
+        }
+
+        if (skill.mpCost && p.mp < skill.mpCost) {
+            onEventLog("MP가 부족합니다.");
+            return;
+        }
+
+        if (skill.mpCost) p.mp -= skill.mpCost;
+        p.cooldowns[skillId] = skill.cooldown || 0;
+
+        // Visual Effects for Buffs/Active Skills
+        if (skill.type === 'buff') {
+            SoundService.playLevelUp(); 
+            spawnDamageNumber(p.x, p.y, skill.name, 'cyan');
+            // Buff Aura Effect
+            state.current.particles.push({ 
+                id: Math.random().toString(), 
+                x: p.x + p.width/2, y: p.y + p.height, 
+                text: '', color: 'rgba(255, 255, 0, 0.5)', 
+                life: 30, maxLife: 30, vx: 0, vy: -5,
+                shape: 'pillar', width: 40, height: 80
+            });
+            p.buffs[skill.id] = skill.duration || 600;
+        }
+
+        switch (skill.id) {
+            case 'PowerStrike':
+            case 'SlashBlast':
+            case 'DoubleStab':
+            case 'SpearCrusher':
+            case 'GroundSmash':
+            case 'Brandish':
+            case 'SpearPanic':
+                // Melee Slash Effect
+                state.current.particles.push({
+                    id: Math.random().toString(),
+                    x: p.x + (p.direction * 30), y: p.y + 10,
+                    text: '', color: skill.id === 'PowerStrike' ? '#ffcc00' : '#ff4444',
+                    life: 15, maxLife: 15, vx: p.direction * 2, vy: 0,
+                    shape: 'slash', width: 100, height: 100, rotation: p.direction === 1 ? 0 : 180
+                });
+                performAttack(skill);
+                break;
+                
+            case 'Thunderbolt':
+                SoundService.playMagicThunder();
+                // Find enemies nearby
+                const targets = state.current.enemies.filter(e => 
+                    !e.isDead && Math.abs(e.x - p.x) < 400 && Math.abs(e.y - p.y) < 150
+                );
+                
+                targets.forEach(e => {
+                    // Lightning Effect
+                    state.current.particles.push({
+                        id: Math.random().toString(),
+                        x: p.x + p.width/2, y: p.y + p.height/2,
+                        text: '', color: '#00ffff',
+                        life: 20, maxLife: 20, vx: 0, vy: 0,
+                        shape: 'lightning', targetX: e.x + e.width/2, targetY: e.y + e.height/2
+                    });
+                    damageEnemy(e, p.attack * (skill.damageMult || 1.5));
+                });
+                if (targets.length === 0) performAttack(skill); // Fallback
+                break;
+                
+            case 'ColdBeam':
+            case 'IceShot':
+            case 'Blizzard':
+                 SoundService.playMagicIce();
+                 const iceTargets = state.current.enemies.filter(e => 
+                    !e.isDead && Math.abs(e.x - p.x) < (skill.id === 'Blizzard' ? 800 : 300)
+                 );
+                 iceTargets.forEach(e => {
+                    state.current.particles.push({
+                        id: Math.random().toString(),
+                        x: e.x + e.width/2, y: e.y + e.height,
+                        text: '', color: '#aaddff',
+                        life: 40, maxLife: 40, vx: 0, vy: -1,
+                        shape: 'pillar', width: 50, height: 100
+                    });
+                    damageEnemy(e, p.attack * (skill.damageMult || 2.0));
+                 });
+                 if (iceTargets.length === 0) performAttack(skill);
+                 break;
+
+            case 'Heal':
+                heal(p.maxHp * 0.5);
+                state.current.particles.push({ id: Math.random().toString(), x: p.x, y: p.y - 50, text: '💖', color: 'pink', life: 40, maxLife: 40, vx: 0, vy: -1, shape: 'text' });
+                // Ring Effect
+                state.current.particles.push({ 
+                    id: Math.random().toString(), x: p.x + p.width/2, y: p.y + p.height/2, 
+                    text: '', color: 'rgba(255, 200, 200, 0.5)', life: 30, maxLife: 30, 
+                    vx: 0, vy: 0, shape: 'ring', scale: 1 
+                });
+                break;
+                
+            case 'ArrowRain':
+            case 'Meteor':
+                // Rain from sky
+                const rainCount = 10;
+                for(let i=0; i<rainCount; i++) {
+                    setTimeout(() => {
+                        const targetX = p.x + (Math.random() - 0.5) * 600;
+                        state.current.projectiles.push({
+                            id: Math.random().toString(),
+                            x: targetX, y: 0,
+                            width: 20, height: 40,
+                            vx: (Math.random()-0.5)*2, vy: 15,
+                            damage: p.attack * (skill.damageMult || 2),
+                            color: skill.id === 'Meteor' ? '#ff4400' : '#ffff00',
+                            emoji: skill.id === 'Meteor' ? '☄️' : '🏹',
+                            life: 100, isDead: false, isMagic: true, skillId: skill.id
+                        });
+                    }, i * 100);
+                }
+                break;
+
+            case 'Teleport':
+                state.current.particles.push({ 
+                    id: Math.random().toString(), x: p.x + p.width/2, y: p.y + p.height/2, 
+                    text: '', color: '#aaf', life: 15, maxLife: 15, vx: 0, vy: 0, shape: 'ring', scale: 0.5
+                });
+                p.x += p.direction * 250;
+                SoundService.playMagicFireball(); 
+                break;
+                
+            default:
+                performAttack(skill);
+                break;
+        }
+    };
+
+    const performAttack = (skill?: any) => {
+        const p = state.current.player;
+        
+        // Setup cooldown and state
+        p.attackCooldown = skill ? 20 : p.maxAttackCooldown; 
+        
+        if (skill) {
+             if (skill.classType === 'Mage') SoundService.playMagicFireball();
+             else SoundService.playAttack();
+        } else {
+             SoundService.playAttack();
+             // Default Attack Slash
+             const weapon = WEAPONS[p.currentWeapon];
+             if (weapon.type === 'melee') {
+                 state.current.particles.push({
+                    id: Math.random().toString(),
+                    x: p.x + (p.direction * 20), y: p.y + 15,
+                    text: '', color: '#ffffff',
+                    life: 10, maxLife: 10, vx: p.direction * 1, vy: 0,
+                    shape: 'slash', width: 80, height: 80, rotation: p.direction === 1 ? 0 : 180
+                });
+             }
+        }
+
+        const weapon = WEAPONS[p.currentWeapon];
+        const damageMult = (skill?.damageMult || 1) * (weapon.damageMult || 1);
+        const range = (skill ? weapon.range * 1.5 : weapon.range);
+
+        if (weapon.type === 'ranged' || (skill && skill.classType === 'Mage')) {
+            const projId = Math.random().toString(36).substr(2, 9);
+            const isMagic = skill?.classType === 'Mage';
+            state.current.projectiles.push({
+                id: projId,
+                x: p.direction === 1 ? p.x + p.width : p.x,
+                y: p.y + p.height / 2 - 10,
+                width: 20, height: 20,
+                vx: p.direction * (weapon.speed || 15),
+                vy: 0,
+                damage: p.attack * damageMult,
+                color: isMagic ? '#55f' : '#fff',
+                emoji: skill?.icon || weapon.projectile || '•',
+                life: 60,
+                isDead: false,
+                isMagic: isMagic,
+                skillId: skill?.id,
+                weaponType: p.currentWeapon
+            });
+        } else {
+            const hitbox: Rect = {
+                x: p.direction === 1 ? p.x + p.width : p.x - range,
+                y: p.y,
+                width: range,
+                height: p.height
+            };
+            
+            state.current.enemies.forEach(e => {
+                // ADDED Y CHECK HERE for Melee
+                if (!e.isDead && checkCollision(hitbox, e) && Math.abs(p.y - e.y) < 50) {
+                    damageEnemy(e, p.attack * damageMult);
+                }
+            });
+        }
+    };
+
+    const damageEnemy = (enemy: Enemy, damage: number) => {
+        const finalDamage = Math.floor(damage);
+        enemy.hp -= finalDamage;
+        enemy.freezeTimer = 5; 
+        
+        spawnDamageNumber(enemy.x, enemy.y, finalDamage.toString(), '#ffaa00');
+        SoundService.playEnemyHit();
+        
+        // Hit Effect
+        state.current.particles.push({
+            id: Math.random().toString(),
+            x: enemy.x + enemy.width/2, y: enemy.y + enemy.height/2,
+            text: '', color: 'white', life: 10, maxLife: 10, vx: 0, vy: 0,
+            shape: 'ring', scale: 0.5
+        });
+
+        if (enemy.hp <= 0 && !enemy.isDead) {
+            enemy.isDead = true;
+            enemy.deathTimer = 30; 
+            
+            const p = state.current.player;
+            p.exp += enemy.expValue;
+            onEventLog(`+${enemy.expValue} EXP`);
+            
+            const currentQuest = currentQuestRef.current;
+            if (currentQuest && currentQuest.targetMonster === enemy.type && !currentQuest.isCompleted) {
+                // Increased drop rate to 90%
+                if (Math.random() < 0.9) {
+                    const dropData = ENEMY_TYPES[enemy.type as keyof typeof ENEMY_TYPES];
+                    state.current.items.push({
+                        id: Math.random().toString(),
+                        type: 'QuestItem',
+                        x: enemy.x, y: enemy.y, width: 30, height: 30,
+                        vx: (Math.random() - 0.5) * 5, vy: -6,
+                        value: 1,
+                        emoji: dropData ? dropData.dropEmoji : '📦',
+                        questItemName: dropData ? dropData.dropName : '퀘스트 아이템',
+                        life: 1200 
+                    });
+                }
+            }
+
+            if (p.exp >= p.maxExp) {
+                p.level++;
+                p.exp -= p.maxExp;
+                p.maxExp = LEVELS_EXP[p.level] || p.maxExp * 1.2;
+                p.sp += 3;
+                p.maxHp += 50;
+                p.maxMp += 30;
+                p.hp = p.maxHp;
+                p.mp = p.maxMp;
+                SoundService.playLevelUp();
+                spawnDamageNumber(p.x, p.y - 40, "LEVEL UP!", "#ffff00", -2);
+                
+                // Level Up Ring Effect
+                state.current.particles.push({
+                    id: Math.random().toString(),
+                    x: p.x + p.width/2, y: p.y + p.height,
+                    text: '', color: 'gold', life: 60, maxLife: 60, vx: 0, vy: -2,
+                    shape: 'pillar', width: 60, height: 120
+                });
+                
+                onEventLog(`레벨 업! Lv.${p.level}`);
+            }
+
+            // Increased gold drop rate to 80%
+            if (Math.random() < 0.8) {
+                 state.current.items.push({
+                     id: Math.random().toString(),
+                     type: 'Gold',
+                     x: enemy.x, y: enemy.y, width: 20, height: 20,
+                     vx: (Math.random() - 0.5) * 5, vy: -5,
+                     value: Math.floor(enemy.expValue * (0.5 + Math.random())),
+                     emoji: '💰', life: 400
+                 });
+            }
+        }
+    };
+
+    const spawnDamageNumber = (x: number, y: number, text: string, color: string, vy: number = -3) => {
+        damageNumbers.current.push({ x, y, text, life: 60, color, vy });
+    };
+
+    const checkCollision = (r1: Rect, r2: Rect) => {
+        return r1.x < r2.x + r2.width &&
+               r1.x + r1.width > r2.x &&
+               r1.y < r2.y + r2.height &&
+               r1.y + r1.height > r2.y;
+    };
+
+    // --- Imperative Handle ---
+    useImperativeHandle(ref, () => ({
+        purchasePotion: (type) => {
+            const p = state.current.player;
+            if (p.gold >= UPGRADE_COSTS.POTION) {
+                p.gold -= UPGRADE_COSTS.POTION;
+                if (type === 'HP') p.hpPotions++;
+                else p.mpPotions++;
+                SoundService.playCoin();
+                return true;
+            }
+            return false;
+        },
+        upgradeStat: (type, cost) => {
+            const p = state.current.player;
+            if (p.gold >= cost) {
+                p.gold -= cost;
+                if (type === 'ATK') p.attack += 5;
+                if (type === 'HP') { p.maxHp += 50; p.hp = p.maxHp; }
+                if (type === 'MP') { p.maxMp += 30; p.mp = p.maxMp; }
+                SoundService.playLevelUp();
+                return true;
+            }
+            return false;
+        },
+        switchWeapon: (weapon) => {
+             switchWeapon(weapon);
+        },
+        upgradeSkill: (skillId) => {
+             const p = state.current.player;
+             const skill = SKILL_TREE.find(s => s.id === skillId);
+             if (p.sp > 0 && skill) {
+                 const current = p.skills[skillId] || 0;
+                 if (current < skill.maxLevel) {
+                     p.skills[skillId] = current + 1;
+                     p.sp--;
+                     SoundService.playCoin(); 
+                 }
+             }
+        },
+        assignSkillSlot: (skillId, slotKey) => {
+             const p = state.current.player;
+             if (p.skillSlots[slotKey] === skillId) {
+                 delete p.skillSlots[slotKey];
+                 return 'removed';
+             } else {
+                 p.skillSlots[slotKey] = skillId;
+                 return 'assigned';
+             }
+        },
+        jobAdvance: () => {
+             const p = state.current.player;
+             if (p.level >= 30 && !p.isAdvanced && ADVANCED_CLASS_NAMES[p.classType]) {
+                 p.isAdvanced = true;
+                 p.name = ADVANCED_CLASS_NAMES[p.classType];
+                 p.attack += 20;
+                 p.maxHp += 200;
+                 p.hp = p.maxHp;
+                 
+                 const advancedWeapon = CLASS_INFOS[p.classType].weapon; 
+                 let newWeapon: WeaponType = 'Sword';
+                 if (p.classType === 'Warrior') newWeapon = 'Greatsword';
+                 if (p.classType === 'Lancer') newWeapon = 'Polearm';
+                 if (p.classType === 'Archer') newWeapon = 'Crossbow';
+                 if (p.classType === 'Gunner') newWeapon = 'Cannon';
+                 if (p.classType === 'Mage') newWeapon = 'Staff';
+                 
+                 p.unlockedWeapons.push(newWeapon);
+                 p.currentWeapon = newWeapon;
+                 
+                 SoundService.playLevelUp();
+                 onEventLog(`전직 완료! ${p.name}`);
+             }
+        },
+        unlockAllSkills: () => {
+             const p = state.current.player;
+             SKILL_TREE.forEach(s => {
+                 if (s.classType === 'All' || s.classType === p.classType) {
+                     p.skills[s.id] = s.maxLevel;
+                 }
+             });
+             p.unlockedWeapons = Object.keys(WEAPONS) as WeaponType[];
+        }
+    }));
+
+    // --- GAME LOOP ---
+    const gameLoop = (time: number) => {
+        if (!state.current.player) return; 
+        
+        if (lastTime.current === 0) lastTime.current = time;
+        const delta = time - lastTime.current;
+        const dt = Math.min(delta / 16.67, 2); 
+        lastTime.current = time;
+
+        // Use ref for gameActive to prevent stale closure
+        if (gameActiveRef.current) update(dt);
+        draw();
+
+        const boss = state.current.enemies.find(e => e.isBoss) || null;
+        onStatsUpdate(state.current.player, boss, state.current.stageLevel, BIOMES[state.current.biomeIndex].name);
+
+        requestRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    const update = (dt: number) => {
+        const p = state.current.player;
+        const currentKeys = keyBindingsRef.current; // Use ref for keys
+        const currentQuest = currentQuestRef.current;
+        
+        // --- Player Physics ---
+        if (!p.isDead) {
+            // Movement
+            if (keysPressed.current.has(currentKeys.LEFT)) {
+                p.vx = -MOVE_SPEED * (p.buffs['Haste'] ? 1.4 : 1);
+                p.direction = -1;
+            } else if (keysPressed.current.has(currentKeys.RIGHT)) {
+                p.vx = MOVE_SPEED * (p.buffs['Haste'] ? 1.4 : 1);
+                p.direction = 1;
+            } else {
+                p.vx *= FRICTION;
+                if (Math.abs(p.vx) < 0.1) p.vx = 0;
+            }
+
+            // Jump
+            if (keysPressed.current.has(currentKeys.JUMP)) {
+                // Ground check
+                let canJump = p.y + p.height >= GROUND_Y;
+                if (!canJump) {
+                     state.current.platforms.forEach(plat => {
+                         if (p.x + p.width > plat.x && p.x < plat.x + plat.width && Math.abs((p.y + p.height) - plat.y) < 5) {
+                             canJump = true;
+                         }
+                     });
+                }
+
+                if (canJump && p.vy >= 0) {
+                    p.vy = JUMP_FORCE;
+                    p.jumps = 1;
+                    SoundService.playJump();
+                    keysPressed.current.delete(currentKeys.JUMP); 
+                } else if (p.jumps < p.maxJumps + (p.skills['DoubleJump'] ? 1 : 0) && !keysPressed.current.has('jumpHeld')) {
+                    p.vy = JUMP_FORCE * 0.8;
+                    p.jumps++;
+                    SoundService.playJump();
+                    state.current.particles.push({
+                        id: Math.random().toString(),
+                        x: p.x, y: p.y + p.height,
+                        text: '💨', color: 'white', life: 20, maxLife: 20, vx: -p.direction*2, vy: 0, shape: 'text'
+                    });
+                    keysPressed.current.delete(currentKeys.JUMP);
+                }
+            }
+
+            // Attack Logic
+            if (keysPressed.current.has(currentKeys.ATTACK) && p.attackCooldown <= 0) {
+                performAttack();
+            }
+            if (p.attackCooldown > 0) p.attackCooldown -= dt;
+            
+            // Skill Cooldowns Tick
+            Object.keys(p.cooldowns).forEach(k => {
+                if (p.cooldowns[k] > 0) p.cooldowns[k] -= dt;
+            });
+            
+            p.isAttacking = p.attackCooldown > 10;
+
+            // Gravity
+            p.vy += GRAVITY * dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+
+            // --- Collisions ---
+            // Ground
+            if (p.y + p.height > GROUND_Y) {
+                p.y = GROUND_Y - p.height;
+                p.vy = 0;
+            }
+
+            // Platforms
+            if (p.vy >= 0) { 
+                state.current.platforms.forEach(plat => {
+                    if (
+                        p.x + p.width > plat.x + 10 && 
+                        p.x < plat.x + plat.width - 10 &&
+                        p.y + p.height >= plat.y &&
+                        p.y + p.height <= plat.y + 20 
+                    ) {
+                        p.y = plat.y - p.height;
+                        p.vy = 0;
+                    }
+                });
+            }
+
+            // World Bounds
+            if (p.x < 0) p.x = 0;
+
+            // Buffs
+            Object.keys(p.buffs).forEach(k => {
+                if (p.buffs[k] > 0) p.buffs[k] -= dt;
+                else delete p.buffs[k];
+            });
+
+            // Invincibility
+            if (p.invincibilityTimer > 0) p.invincibilityTimer -= dt;
+            
+            // Mana Regen
+            if (p.mp < p.maxMp) p.mp += 0.05 * dt + (p.skills['MPRestore'] || 0) * 0.01;
+        }
+
+        // --- Camera ---
+        const targetCamX = p.x - VIEWPORT_WIDTH / 2 + p.width / 2;
+        const clampedCamX = Math.max(0, Math.min(state.current.worldWidth - VIEWPORT_WIDTH, targetCamX));
+        state.current.cameraX += (clampedCamX - state.current.cameraX) * 0.1;
+        
+        // Shake
+        if (state.current.shakeTimer > 0) {
+            state.current.shakeTimer -= dt;
+            state.current.cameraX += (Math.random() - 0.5) * 10;
+        }
+
+        // --- Projectiles ---
+        state.current.projectiles.forEach(proj => {
+            proj.x += proj.vx * dt;
+            proj.y += proj.vy * dt;
+            proj.life -= dt;
+            if (proj.life <= 0) proj.isDead = true;
+
+            // Collision
+            if (proj.isEnemy) {
+                // Hit Player
+                if (!p.isDead && p.invincibilityTimer <= 0 && checkCollision(proj, p)) {
+                    const dmg = Math.max(1, Math.floor(proj.damage * (1 - (p.skills['Achilles']||0)*0.02)));
+                    p.hp -= dmg;
+                    p.invincibilityTimer = 60;
+                    spawnDamageNumber(p.x, p.y, `-${dmg}`, 'red');
+                    SoundService.playHit();
+                    proj.isDead = true;
+                    if (p.hp <= 0) { p.isDead = true; onGameOver(); }
+                }
+            } else {
+                // Hit Enemy
+                state.current.enemies.forEach(e => {
+                    if (!e.isDead && !proj.isDead && checkCollision(proj, e)) {
+                        damageEnemy(e, proj.damage);
+                        if (!proj.piercing) proj.isDead = true;
+                    }
+                });
+            }
+        });
+        state.current.projectiles = state.current.projectiles.filter(p => !p.isDead);
+
+        // --- Enemies ---
+        spawnTimer.current -= dt;
+        if (spawnTimer.current <= 0 && state.current.enemies.length < 6 + state.current.stageLevel) {
+            spawnEnemy();
+            spawnTimer.current = 80; 
+        }
+
+        state.current.enemies.forEach(e => {
+            if (e.isDead) {
+                if (e.deathTimer && e.deathTimer > 0) e.deathTimer -= dt;
+                return;
+            }
+            
+            if (e.freezeTimer > 0) {
+                e.freezeTimer -= dt;
+            } else {
+                // AI
+                const dist = p.x - e.x;
+                if (Math.abs(dist) < 800) { 
+                     e.vx = (dist > 0 ? 1 : -1) * (e.entitySpeed || 1); 
+                     e.direction = dist > 0 ? 1 : -1;
+                     
+                     // Attack
+                     if (e.attackTimer > 0) e.attackTimer -= dt;
+                     else if (Math.abs(dist) < (e.isRanged ? 400 : 50)) {
+                         e.attackTimer = 120;
+                         if (e.isRanged) {
+                              state.current.projectiles.push({
+                                  id: Math.random().toString(),
+                                  x: e.x + (e.direction===1 ? e.width : 0),
+                                  y: e.y + e.height/2,
+                                  width: 15, height: 15,
+                                  vx: e.direction * 5, vy: 0,
+                                  damage: e.damage,
+                                  color: 'red',
+                                  emoji: '🦴',
+                                  life: 100, isDead: false, isEnemy: true
+                              });
+                         } else {
+                              // MELEE ATTACK CHECK - Added Y check to prevent hitting from below
+                              if (!p.isDead && p.invincibilityTimer <= 0 && Math.abs(p.y - e.y) < 50) {
+                                  const dmg = Math.max(1, Math.floor(e.damage * (1 - (p.skills['Achilles']||0)*0.02)));
+                                  p.hp -= dmg;
+                                  p.invincibilityTimer = 60;
+                                  p.vx = e.direction * 10; 
+                                  p.vy = -5;
+                                  spawnDamageNumber(p.x, p.y, `-${dmg}`, 'red');
+                                  SoundService.playHit();
+                                  if (p.hp <= 0) { p.isDead = true; onGameOver(); }
+                              }
+                         }
+                     }
+                } else {
+                    e.vx = 0;
+                }
+                
+                e.x += e.vx * dt;
+                
+                // Enemy Physics
+                let enemyOnGround = false;
+                if (e.y + e.height >= GROUND_Y) {
+                    e.y = GROUND_Y - e.height;
+                    e.vy = 0;
+                    enemyOnGround = true;
+                } else {
+                    // Enemy Platform Collision
+                    state.current.platforms.forEach(plat => {
+                        if (e.vy >= 0 && e.x + e.width > plat.x && e.x < plat.x + plat.width && e.y + e.height >= plat.y && e.y + e.height <= plat.y + 20) {
+                            e.y = plat.y - e.height;
+                            e.vy = 0;
+                            enemyOnGround = true;
+                        }
+                    });
+                }
+                
+                if (!enemyOnGround) e.vy += GRAVITY * dt;
+                e.y += e.vy * dt;
+            }
+        });
+        state.current.enemies = state.current.enemies.filter(e => !e.isDead || (e.deathTimer && e.deathTimer > 0));
+
+        // --- Items ---
+        state.current.items.forEach(item => {
+            // Magnet / Auto-collect logic
+            if (!p.isDead && item.life > 0) {
+                const dx = p.x - item.x;
+                const dy = (p.y + p.height/2) - item.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // Strong magnet effect if close or if it's been alive for a bit
+                if (dist < 400) {
+                    item.vx += (dx / dist) * 2; 
+                    item.vy += (dy / dist) * 2;
+                }
+            }
+
+            item.vy += GRAVITY * dt;
+            item.x += item.vx * dt;
+            item.y += item.vy * dt;
+            
+            if (item.y + item.height > GROUND_Y) {
+                item.y = GROUND_Y - item.height;
+                item.vy *= -0.5; 
+                item.vx *= 0.9;
+            }
+            // Platform bounce for items
+            state.current.platforms.forEach(plat => {
+                if (item.vy >= 0 && item.x + item.width > plat.x && item.x < plat.x + plat.width && item.y + item.height >= plat.y && item.y + item.height <= plat.y + 20) {
+                    item.y = plat.y - item.height;
+                    item.vy *= -0.5;
+                    item.vx *= 0.9;
+                }
+            });
+
+            // Pickup
+            if (checkCollision(item, p)) {
+                if (item.type === 'Gold') {
+                    p.gold += item.value;
+                    SoundService.playCoin();
+                    spawnDamageNumber(p.x, p.y - 40, `+${item.value} G`, 'yellow');
+                } else if (item.type === 'QuestItem') {
+                    if (currentQuest && !currentQuest.isCompleted) {
+                        const newCount = currentQuest.currentCount + 1;
+                        onQuestUpdate(newCount);
+                        SoundService.playCoin(); 
+                        spawnDamageNumber(p.x, p.y - 60, `${item.questItemName || 'Item'}!`, 'cyan', -2);
+                        onEventLog(`${item.questItemName} 획득! (${newCount}/${currentQuest.targetCount})`);
+                        
+                        if (newCount >= currentQuest.targetCount) {
+                            onQuestComplete(currentQuest.rewardExp, 0);
+                        }
+                    }
+                }
+                item.life = 0; 
+            }
+            item.life -= dt;
+        });
+        state.current.items = state.current.items.filter(i => i.life > 0);
+
+        // --- Stage Progression ---
+        if (p.x > state.current.worldWidth - 50) {
+            // Next Stage
+            state.current.stageLevel++;
+            p.maxStageReached = Math.max(p.maxStageReached, state.current.stageLevel);
+            p.x = 100;
+            state.current.cameraX = 0;
+            
+            // New Platforms
+            state.current.worldWidth = 3000 + (state.current.stageLevel * 200);
+            state.current.platforms = generatePlatforms(state.current.worldWidth);
+            
+            // Biome Check
+            const currentStage = state.current.stageLevel;
+            let newBiomeIndex = BIOMES.findIndex(b => currentStage >= b.startStage && currentStage <= b.endStage);
+            if (newBiomeIndex === -1) newBiomeIndex = BIOMES.length - 1;
+            state.current.biomeIndex = newBiomeIndex;
+            
+            onEventLog(`Stage ${state.current.stageLevel}: ${BIOMES[newBiomeIndex].name}`);
+            state.current.enemies = []; // Clear enemies
+            state.current.items = []; // Clear items
+        }
+    };
+
+    const spawnEnemy = () => {
+        const biome = BIOMES[state.current.biomeIndex];
+        
+        // Pick enemy based on biome
+        const enemyKeys = Object.keys(ENEMY_TYPES);
+        const biomeEnemies = enemyKeys.slice(state.current.biomeIndex * 4, (state.current.biomeIndex + 1) * 4);
+        if (biomeEnemies.length === 0) return;
+        
+        const typeKey = biomeEnemies[Math.floor(Math.random() * biomeEnemies.length)];
+        const stats = ENEMY_TYPES[typeKey as keyof typeof ENEMY_TYPES];
+        
+        // Spawn right side of screen relative to player + offset
+        const spawnX = Math.min(state.current.worldWidth - 100, state.current.cameraX + VIEWPORT_WIDTH + 100 + Math.random() * 400);
+        
+        state.current.enemies.push({
+            id: Math.random().toString(),
+            x: spawnX, y: GROUND_Y - stats.height,
+            width: stats.width, height: stats.height,
+            vx: 0, vy: 0,
+            hp: stats.hp * (1 + state.current.stageLevel * 0.2),
+            maxHp: stats.hp * (1 + state.current.stageLevel * 0.2),
+            damage: stats.damage * (1 + state.current.stageLevel * 0.1),
+            expValue: stats.exp * (1 + state.current.stageLevel * 0.1),
+            type: typeKey,
+            patrolStart: spawnX - 200, patrolEnd: spawnX + 200,
+            attackTimer: 0, isBoss: false,
+            freezeTimer: 0, stunTimer: 0,
+            isRanged: stats.isRanged || false,
+            color: 'red', emoji: stats.emoji, direction: -1, isDead: false,
+            entitySpeed: stats.speed 
+        } as any);
+    };
+
+    const draw = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        const p = state.current.player;
+        const camX = state.current.cameraX;
+        const biome = BIOMES[state.current.biomeIndex];
+
+        // 1. Clear & Background
+        const gradient = ctx.createLinearGradient(0, 0, 0, VIEWPORT_HEIGHT);
+        gradient.addColorStop(0, biome.sky[0]);
+        gradient.addColorStop(1, biome.sky[1]);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        
+        // 2. World Objects (Platforms)
+        ctx.save();
+        ctx.translate(-camX, 0);
+        
+        // Stage End Portal
+        ctx.font = '60px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('🚪', state.current.worldWidth - 30, GROUND_Y);
+        
+        // Platforms
+        state.current.platforms.forEach(plat => {
+            // Ground Top Layer
+            ctx.fillStyle = biome.top;
+            ctx.fillRect(plat.x, plat.y, plat.width, 10);
+            // Ground Body
+            ctx.fillStyle = biome.ground;
+            ctx.fillRect(plat.x, plat.y + 10, plat.width, plat.height - 10);
+        });
+        
+        // 3. Entities
+        
+        // Enemies
+        state.current.enemies.forEach(e => {
+            ctx.save();
+            ctx.translate(e.x + e.width/2, e.y + e.height/2);
+            ctx.scale(e.direction === 1 ? -1 : 1, 1);
+            if (e.isDead) ctx.globalAlpha = (e.deathTimer || 0) / 30;
+            
+            ctx.font = '40px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(e.emoji, 0, 0);
+            
+            ctx.restore();
+
+            // HP Bar (World Space)
+            if (!e.isDead) {
+                 ctx.fillStyle = 'red';
+                 ctx.fillRect(e.x, e.y - 10, e.width, 5);
+                 ctx.fillStyle = 'green';
+                 ctx.fillRect(e.x, e.y - 10, e.width * (e.hp / e.maxHp), 5);
+            }
+        });
+
+        // Player (Full Body Rendering)
+        if (!p.isDead) {
+            ctx.save();
+            // Move pivot to center bottom of the player hitbox for better standing
+            ctx.translate(p.x + p.width/2, p.y + p.height - 10); 
+            ctx.scale(p.direction === 1 ? -1 : 1, 1); // Face direction
+            if (p.invincibilityTimer > 0 && Math.floor(Date.now() / 100) % 2 === 0) ctx.globalAlpha = 0.5;
+
+            // --- ANIMATION CALCS ---
+            const time = Date.now();
+            const isMoving = Math.abs(p.vx) > 0.1;
+            const isJumping = Math.abs(p.vy) > 0.1;
+            
+            // Walk cycle: sine wave for legs
+            const walkCycle = isMoving && !isJumping ? Math.sin(time / 100) : 0;
+            const legOffset = walkCycle * 8;
+            
+            // Bobbing body
+            const bodyBob = isMoving && !isJumping ? Math.abs(Math.sin(time / 50)) * 2 : 0;
+
+            // Class Colors
+            const bodyColors: Record<string, string> = {
+                Warrior: '#8B0000', // Dark Red
+                Lancer: '#4B0082',  // Indigo
+                Archer: '#228B22',  // Forest Green
+                Gunner: '#555555',  // Grey
+                Mage: '#00008B'     // Dark Blue
+            };
+            const bodyColor = bodyColors[p.classType] || '#333';
+            
+            // --- DRAW LEGS ---
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#222';
+
+            // Back Leg
+            ctx.beginPath();
+            ctx.moveTo(-5, -15);
+            ctx.lineTo(-5 - legOffset, 5); // Foot position
+            ctx.stroke();
+
+            // Front Leg
+            ctx.beginPath();
+            ctx.moveTo(5, -15);
+            ctx.lineTo(5 + legOffset, 5);
+            ctx.stroke();
+
+            // --- DRAW BODY ---
+            // Tunic/Armor
+            ctx.fillStyle = bodyColor;
+            // Simple rounded rect for body
+            ctx.beginPath();
+            ctx.roundRect(-12, -35 - bodyBob, 24, 25, 4);
+            ctx.fill();
+            
+            // Belt/Detail
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-12, -15 - bodyBob, 24, 4);
+
+            // --- DRAW HEAD (EMOJI) ---
+            ctx.font = '35px serif'; // Smaller head for better proportions
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Adjusted Y offset for smaller head and slight bob
+            ctx.fillText(p.emoji, 0, -50 - bodyBob);
+
+            // --- DRAW WEAPON (In Hand) ---
+            const weapon = WEAPONS[p.currentWeapon];
+            if (weapon) {
+                ctx.save();
+                // Hand position (front arm)
+                const handX = 8;
+                const handY = -25 - bodyBob;
+                
+                ctx.translate(handX, handY);
+                
+                let rotation = 0;
+                if (p.isAttacking) {
+                     if (weapon.type === 'melee') rotation = -100 * Math.PI / 180; // Swing
+                     else rotation = -10 * Math.PI / 180; // Recoil
+                } else {
+                     if (weapon.type === 'melee') rotation = -45 * Math.PI / 180; // Idle hold
+                     else rotation = 0; // Aim
+                }
+                
+                ctx.rotate(rotation);
+                
+                ctx.font = '24px serif';
+                if (weapon.type === 'ranged') {
+                     if (p.currentWeapon === 'Gun') {
+                         ctx.save();
+                         ctx.scale(-1, 1); // Flip gun sprite
+                         ctx.fillText(weapon.emoji, -10, 0); 
+                         ctx.restore();
+                     } else {
+                         ctx.fillText(weapon.emoji, 5, 0); 
+                     }
+                } else {
+                     // Melee held by handle
+                     ctx.fillText(weapon.emoji, 0, -10); 
+                }
+                
+                // Draw Hand (Circle)
+                ctx.fillStyle = '#FFDAB9'; // Peach skin tone
+                ctx.beginPath();
+                ctx.arc(0, 0, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            // Name Tag
+            ctx.scale(p.direction === 1 ? -1 : 1, 1); // Flip back for text
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 4;
+            ctx.fillText(p.name, 0, -85 - bodyBob);
+            ctx.shadowBlur = 0;
+
+            ctx.restore();
+        }
+
+        // Projectiles
+        state.current.projectiles.forEach(proj => {
+            ctx.save();
+            ctx.translate(proj.x + proj.width/2, proj.y + proj.height/2);
+            if (proj.vx < 0) ctx.scale(-1, 1);
+            ctx.font = '20px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(proj.emoji, 0, 0);
+            ctx.restore();
+        });
+
+        // Items
+        state.current.items.forEach(item => {
+            ctx.save();
+            ctx.translate(item.x + item.width/2, item.y + item.height/2);
+            ctx.font = '20px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.emoji, 0, Math.sin(Date.now()/200)*5); // Float
+            ctx.restore();
+        });
+        
+        // Particles & Visual Effects
+        state.current.particles.forEach(pt => {
+             ctx.save();
+             ctx.translate(pt.x, pt.y);
+             
+             // Opacity based on life
+             ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+
+             if (pt.shape === 'slash') {
+                 // Draw Slash Wave
+                 ctx.rotate((pt.rotation || 0) * Math.PI / 180);
+                 ctx.fillStyle = pt.color;
+                 const w = pt.width || 50;
+                 const h = pt.height || 50;
+                 
+                 ctx.beginPath();
+                 ctx.moveTo(0, 0);
+                 ctx.quadraticCurveTo(w/2, -h/2, w, 0);
+                 ctx.quadraticCurveTo(w/2, -h/4, 0, 0);
+                 ctx.fill();
+                 
+                 // Glow
+                 ctx.shadowBlur = 10;
+                 ctx.shadowColor = pt.color;
+                 ctx.fill();
+                 ctx.shadowBlur = 0;
+
+             } else if (pt.shape === 'ring') {
+                 // Expanding Ring
+                 const radius = (pt.width || 50) * (1 + (pt.maxLife - pt.life) / 10);
+                 ctx.strokeStyle = pt.color;
+                 ctx.lineWidth = 3;
+                 ctx.beginPath();
+                 ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                 ctx.stroke();
+
+             } else if (pt.shape === 'lightning') {
+                 // Lightning Bolt
+                 const tx = (pt.targetX || 0) - pt.x;
+                 const ty = (pt.targetY || 0) - pt.y;
+                 const dist = Math.sqrt(tx*tx + ty*ty);
+                 const segments = 5;
+                 
+                 ctx.strokeStyle = pt.color;
+                 ctx.lineWidth = 2;
+                 ctx.shadowBlur = 5;
+                 ctx.shadowColor = pt.color;
+                 
+                 ctx.beginPath();
+                 ctx.moveTo(0,0);
+                 
+                 let currX = 0;
+                 let currY = 0;
+                 
+                 for(let i=1; i<segments; i++) {
+                     const ratio = i/segments;
+                     // Add jitter
+                     const jitter = (Math.random() - 0.5) * 30;
+                     const nextX = tx * ratio + jitter;
+                     const nextY = ty * ratio + jitter;
+                     ctx.lineTo(nextX, nextY);
+                     currX = nextX;
+                     currY = nextY;
+                 }
+                 ctx.lineTo(tx, ty);
+                 ctx.stroke();
+                 ctx.shadowBlur = 0;
+
+             } else if (pt.shape === 'pillar') {
+                 // Rising Light Pillar (Ice/Holy)
+                 const w = pt.width || 40;
+                 const h = (pt.height || 100) * Math.min(1, (pt.maxLife - pt.life)/5); // Grow up
+                 
+                 ctx.fillStyle = pt.color;
+                 ctx.globalAlpha = Math.min(1, pt.life/10) * 0.5; // Fade in/out logic
+                 
+                 ctx.fillRect(-w/2, -h, w, h);
+                 
+                 // Core
+                 ctx.fillStyle = '#fff';
+                 ctx.globalAlpha = Math.min(1, pt.life/10) * 0.8;
+                 ctx.fillRect(-w/4, -h, w/2, h);
+
+             } else {
+                 // Default Text Particle
+                 ctx.fillStyle = pt.color;
+                 ctx.font = '15px serif';
+                 ctx.fillText(pt.text, 0, 0);
+             }
+
+             ctx.restore();
+             
+             // Physics update for particles
+             pt.x += pt.vx;
+             pt.y += pt.vy;
+             pt.life--;
+        });
+        state.current.particles = state.current.particles.filter(p => p.life > 0);
+
+        // Damage Numbers (Text) - Rendered on top
+        damageNumbers.current.forEach(dn => {
+            ctx.font = 'bold 20px Arial';
+            ctx.fillStyle = dn.color;
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.strokeText(dn.text, dn.x, dn.y);
+            ctx.fillText(dn.text, dn.x, dn.y);
+            dn.y += dn.vy;
+            dn.life--;
+        });
+        damageNumbers.current = damageNumbers.current.filter(dn => dn.life > 0);
+
+        ctx.restore();
+    };
+
+    return <canvas ref={canvasRef} width={VIEWPORT_WIDTH} height={VIEWPORT_HEIGHT} className="w-full h-full object-contain" />;
 });
 
 export default GameCanvas;
