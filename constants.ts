@@ -1,3 +1,4 @@
+
 import { Skill, KeyBindings, ClassType, WeaponType, MobileControlSettings } from './types';
 
 export const GRAVITY = 0.6;
@@ -18,11 +19,11 @@ export const BIOMES = [
 ];
 
 export const CLASS_INFOS: Record<ClassType, { name: string, desc: string, icon: string, weapon: WeaponType }> = {
-    Warrior: { name: '검사', desc: '강인한 체력과 근접 공격으로 적을 압도하는 전사입니다.', icon: '🛡️', weapon: 'Sword' },
-    Lancer: { name: '창사', desc: '긴 리치를 활용하여 다수의 적을 제압하는 창술사입니다.', icon: '🔱', weapon: 'Spear' },
-    Archer: { name: '궁사', desc: '원거리에서 치명적인 화살을 날리는 날렵한 사냥꾼입니다.', icon: '🏹', weapon: 'Bow' },
-    Gunner: { name: '총사', desc: '화력과 기계 공학을 이용하여 전장을 지배하는 기술자입니다.', icon: '🔫', weapon: 'Gun' },
-    Mage: { name: '마법사', desc: '원소 마법과 신비로운 힘으로 적을 섬멸하는 현자입니다.', icon: '🔮', weapon: 'Sword' },
+    Warrior: { name: '검사', desc: '강인한 체력과 근접 공격으로 적을 압도하는 전사입니다.', icon: '🤺', weapon: 'Sword' },
+    Lancer: { name: '창사', desc: '긴 리치를 활용하여 다수의 적을 제압하는 창술사입니다.', icon: '💂', weapon: 'Spear' },
+    Archer: { name: '궁사', desc: '원거리에서 치명적인 화살을 날리는 날렵한 사냥꾼입니다.', icon: '🧝', weapon: 'Bow' },
+    Gunner: { name: '총사', desc: '화력과 기계 공학을 이용하여 전장을 지배하는 기술자입니다.', icon: '🤠', weapon: 'Gun' },
+    Mage: { name: '마법사', desc: '원소 마법과 신비로운 힘으로 적을 섬멸하는 현자입니다.', icon: '🧙', weapon: 'Sword' },
 };
 
 export const ADVANCED_CLASS_NAMES: Record<ClassType, string> = {

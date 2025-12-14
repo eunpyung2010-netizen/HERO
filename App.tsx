@@ -35,18 +35,20 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
   
+  // Layout State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const [stageInfo, setStageInfo] = useState({ level: 1, name: 'Peaceful Forest' });
   const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
   const [mobileSettings, setMobileSettings] = useState<MobileControlSettings>(DEFAULT_MOBILE_SETTINGS);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
   
-  // Layout State
   const [scale, setScale] = useState(1);
   const [isPortrait, setIsPortrait] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Derived state for game loop
-  const isPaused = isShopOpen || isMapOpen || isSkillsOpen || isSettingsOpen || isImageEditorOpen || isClassSelectionOpen;
+  // CRITICAL FIX: Include mobileMenuOpen in isPaused so game stops when menu is open
+  const isPaused = isShopOpen || isMapOpen || isSkillsOpen || isSettingsOpen || isImageEditorOpen || isClassSelectionOpen || mobileMenuOpen;
   const gameActive = gameStarted && !isGameOver && !isPaused;
 
   const currentQuestRef = useRef<Quest | null>(null);
@@ -65,15 +67,12 @@ const App: React.FC = () => {
        const targetW = 1024;
        
        if (portrait) {
-           // In portrait, we fit the width of the screen
            const newScale = windowW / targetW;
            setScale(newScale);
        } else {
-           // In landscape, we try to fit the whole 1024x600 in the center
            const targetH = 600;
            const scaleX = windowW / targetW;
            const scaleY = windowH / targetH;
-           // Use a safer margin to ensure it fits well within browser UI
            const newScale = Math.min(scaleX, scaleY) * 0.98;
            setScale(newScale); 
        }
@@ -130,9 +129,10 @@ const App: React.FC = () => {
       setGameLogs([]);
       setCurrentQuest(null);
       setGameStarted(false);
-      setPlayerStats(null); // Clear player stats
-      setGameResetKey(prev => prev + 1); // Force GameCanvas Re-mount
+      setPlayerStats(null); 
+      setGameResetKey(prev => prev + 1); 
       setIsClassSelectionOpen(true);
+      setMobileMenuOpen(false); // Close menu on restart
   }, []);
 
   const handleQuestUpdate = useCallback((newCount: number) => {
@@ -245,6 +245,7 @@ const App: React.FC = () => {
           if (e.code === 'Escape') {
               setIsShopOpen(false); setIsMapOpen(false); setIsSkillsOpen(false);
               setIsSettingsOpen(false); setIsImageEditorOpen(false);
+              setMobileMenuOpen(false); // Also close mobile menu
           }
       };
       window.addEventListener('keydown', handleKeyDown);
@@ -276,20 +277,12 @@ const App: React.FC = () => {
     }
   }, [stageInfo.level, gameStarted, customBackground]);
 
-  // Pass-through for mobile controls
   const handleSimulateKey = (code: string, type: 'keydown' | 'keyup') => {
       window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
   };
 
   return (
-    // Use 100dvh for reliable mobile height, ensure background covers everything
     <div className="w-full h-[100dvh] bg-black overflow-hidden select-none flex flex-col relative touch-none">
-        
-      {/* 
-         GAME CONTAINER 
-         - Portrait: Standard flow
-         - Landscape: Absolute centered
-      */}
       <div 
         className={`shadow-2xl bg-slate-800 overflow-hidden flex-shrink-0 transition-transform duration-0 z-0
             ${isPortrait ? 'origin-top-left' : 'absolute top-1/2 left-1/2 origin-center'}
@@ -299,14 +292,13 @@ const App: React.FC = () => {
             height: 600,
             transform: isPortrait 
                 ? `scale(${scale})` 
-                : `translate(-50%, -50%) scale(${scale})`, // Accurate center for landscape
-            // Remove empty space caused by scale only in portrait flow
+                : `translate(-50%, -50%) scale(${scale})`, 
             marginBottom: isPortrait ? `-${600 - (600 * scale)}px` : 0,
             marginRight: isPortrait ? `-${1024 - (1024 * scale)}px` : 0 
         }}
       >
         <GameCanvas 
-          key={gameResetKey} // Force Re-mount on restart
+          key={gameResetKey} 
           ref={gameRef}
           onStatsUpdate={handleStatsUpdate} 
           onEventLog={addLog}
@@ -338,14 +330,15 @@ const App: React.FC = () => {
             biomeName={stageInfo.name}
             keyBindings={keyBindings}
             onJobAdvance={handleJobAdvance}
-            showVirtualControls={!isPortrait} // Hide overlay controls in portrait
+            showVirtualControls={!isPortrait} 
+            // Control Menu State here in App
             forceMenuOpen={mobileMenuOpen}
             onCloseMenu={() => setMobileMenuOpen(false)}
             mobileSettings={mobileSettings}
           />
         )}
 
-        {/* Modals placed inside the scaled area to keep theme consistency */}
+        {/* Modals */}
         {isClassSelectionOpen && <div className="absolute inset-0 z-50"><ClassSelectionModal onSelectClass={handleClassSelect} /></div>}
         {isShopOpen && playerStats && <ShopModal player={playerStats} onClose={handleCloseShop} onPurchase={handlePurchase} />}
         {isMapOpen && playerStats && <WorldMap currentStage={stageInfo.level} maxStageReached={playerStats.maxStageReached} onClose={handleCloseMap} />}
@@ -360,7 +353,6 @@ const App: React.FC = () => {
         )}
       </div>
 
-      {/* PORTRAIT MOBILE CONTROLS (Bottom Half) */}
       {isPortrait && playerStats && (
           <div className="flex-1 w-full bg-slate-900 z-10 relative pb-safe">
               <MobileControls 
