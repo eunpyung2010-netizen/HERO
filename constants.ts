@@ -19,7 +19,7 @@ export const BIOMES = [
 ];
 
 export const CLASS_INFOS: Record<ClassType, { name: string, desc: string, icon: string, weapon: WeaponType }> = {
-    Warrior: { name: '검사', desc: '강인한 체력과 근접 공격으로 적을 압도하는 전사입니다.', icon: '🤺', weapon: 'Sword' },
+    Warrior: { name: '검사', desc: '강인한 체력과 근접 공격으로 적을 압도하는 전사입니다.', icon: '🤴', weapon: 'Sword' },
     Lancer: { name: '창사', desc: '긴 리치를 활용하여 다수의 적을 제압하는 창술사입니다.', icon: '💂', weapon: 'Spear' },
     Archer: { name: '궁사', desc: '원거리에서 치명적인 화살을 날리는 날렵한 사냥꾼입니다.', icon: '🧝', weapon: 'Bow' },
     Gunner: { name: '총사', desc: '화력과 기계 공학을 이용하여 전장을 지배하는 기술자입니다.', icon: '🤠', weapon: 'Gun' },
@@ -34,7 +34,6 @@ export const ADVANCED_CLASS_NAMES: Record<ClassType, string> = {
     Mage: '아크메이지' // Archmage
 };
 
-// Added isRanged property for specific enemies
 export const ENEMY_TYPES = {
   // Forest
   Snail: { emoji: '🐌', hp: 15, damage: 1, exp: 5, width: 30, height: 25, speed: 0.5, dropName: '달팽이 껍질', dropEmoji: '🐚', isRanged: false },
@@ -73,20 +72,19 @@ export const ENEMY_TYPES = {
   Demon: { emoji: '👹', hp: 2000, damage: 90, exp: 1200, width: 60, height: 70, speed: 2.5, dropName: '악마의 뿔', dropEmoji: '😈', isRanged: false }
 };
 
-// Updated weapons with Advanced Classes
 export const WEAPONS: Record<string, { emoji: string, range: number, damageMult: number, cooldown: number, speed: number, type: 'melee' | 'ranged', projectile?: string }> = {
   // Basic Weapons
   Sword: { emoji: '🗡️', range: 80, damageMult: 1.0, cooldown: 20, speed: 0, type: 'melee' },
-  Spear: { emoji: '🔱', range: 170, damageMult: 1.2, cooldown: 35, speed: 0, type: 'melee' }, // Range Increased
+  Spear: { emoji: '🔱', range: 170, damageMult: 1.2, cooldown: 35, speed: 0, type: 'melee' }, 
   Bow: { emoji: '🏹', range: 600, damageMult: 0.8, cooldown: 30, speed: 12, type: 'ranged', projectile: '➹' },
   Gun: { emoji: '🔫', range: 800, damageMult: 0.6, cooldown: 10, speed: 20, type: 'ranged', projectile: '🔴' }, 
   
   // Advanced Weapons
-  Greatsword: { emoji: '⚔️', range: 120, damageMult: 2.5, cooldown: 60, speed: 0, type: 'melee' }, // Warrior -> Berserker
-  Polearm: { emoji: '🤺', range: 220, damageMult: 1.8, cooldown: 45, speed: 0, type: 'melee' }, // Range Increased
-  Crossbow: { emoji: '🦾', range: 700, damageMult: 2.0, cooldown: 60, speed: 18, type: 'ranged', projectile: '➵' }, // Archer -> Sniper
-  Cannon: { emoji: '💣', range: 600, damageMult: 2.2, cooldown: 80, speed: 10, type: 'ranged', projectile: '💣' }, // Gunner -> Captain
-  Staff: { emoji: '🪄', range: 500, damageMult: 1.5, cooldown: 25, speed: 12, type: 'ranged', projectile: '✨' }, // Mage -> Archmage
+  Greatsword: { emoji: '⚔️', range: 120, damageMult: 2.5, cooldown: 60, speed: 0, type: 'melee' },
+  Polearm: { emoji: '🤺', range: 220, damageMult: 1.8, cooldown: 45, speed: 0, type: 'melee' },
+  Crossbow: { emoji: '🦾', range: 700, damageMult: 2.0, cooldown: 60, speed: 18, type: 'ranged', projectile: '➵' },
+  Cannon: { emoji: '💣', range: 600, damageMult: 2.2, cooldown: 80, speed: 10, type: 'ranged', projectile: '💣' },
+  Staff: { emoji: '🪄', range: 500, damageMult: 1.5, cooldown: 25, speed: 12, type: 'ranged', projectile: '✨' },
 };
 
 export const LEVELS_EXP = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 9000, 13000, 18000, 25000, 35000, 50000, 70000, 100000, 150000, 250000, 500000];
@@ -94,7 +92,6 @@ export const LEVELS_EXP = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 9000,
 export const PLAYER_WIDTH = 50;
 export const PLAYER_HEIGHT = 60;
 
-// Predefined Quests per Biome Index
 export const BIOME_QUESTS = [
     // Forest (Index 0)
     [
@@ -140,6 +137,13 @@ export const BIOME_QUESTS = [
     ]
 ];
 
+export const MONSTER_MESSAGES = [
+    "꾸웩!", "아프다!", "두고보자!", "히잉...", "밥줘...", 
+    "강하다...", "도망가자!", "메롱!", "으악!", "살려줘!",
+    "복수할거야!", "너무해!", "배고파...", "집에 갈래", "아야!",
+    "크아앙!", "덤벼라!", "내가 지다니...", "보물은 내꺼야!", "으그극..."
+];
+
 export const UPGRADE_COSTS = {
     ATK: { base: 100, scale: 1.5 },
     HP: { base: 50, scale: 1.2 },
@@ -147,108 +151,107 @@ export const UPGRADE_COSTS = {
     POTION: 50
 };
 
-// ... (Skill Tree remains unchanged) ...
 export const SKILL_TREE: Skill[] = [
     // === SHARED (ROW 0) ===
     { id: 'IronBody', name: '신체 단련', description: '최대 체력이 증가합니다.', maxLevel: 10, icon: '💪', reqLevel: 1, col: 0, row: 0, classType: 'All', type: 'passive' },
-    { id: 'DoubleJump', name: '이단 점프', description: '공중에서 한 번 더 점프할 수 있습니다.', maxLevel: 1, icon: '🚀', reqLevel: 5, col: 1, row: 0, classType: 'All', type: 'passive' },
+    { id: 'DoubleJump', name: '이단 점프', description: '공중에서 한 번 더 점프할 수 있습니다.', maxLevel: 1, icon: '🚀', reqLevel: 1, col: 1, row: 0, classType: 'All', type: 'passive' }, // Req Level Lowered
     { id: 'Haste', name: '헤이스트', description: '이동 속도가 증가합니다.', maxLevel: 5, icon: '👟', reqLevel: 1, col: 2, row: 0, classType: 'All', type: 'passive' },
 
-    // === WARRIOR (Buffed Damage) ===
-    // Lv 10
+    // === WARRIOR ===
+    // Tier 1 (Lv 1)
     { id: 'PowerStrike', name: '파워 스트라이크', description: '강력한 내려치기로 적을 공격합니다.', maxLevel: 10, icon: '💥', reqLevel: 1, col: 0, row: 1, classType: 'Warrior', type: 'active', mpCost: 5, cooldown: 30, damageMult: 2.0 },
-    { id: 'SlashBlast', name: '슬래시 블러스트', description: '주변의 적들을 베어버립니다.', maxLevel: 10, icon: '🌪️', reqLevel: 10, col: 1, row: 1, classType: 'Warrior', type: 'active', mpCost: 10, cooldown: 60, damageMult: 2.5, reqSkill: 'PowerStrike' },
-    // Lv 20
-    { id: 'IronWall', name: '아이언 월', description: '방어력을 높여 받는 피해를 줄입니다. (버프)', maxLevel: 5, icon: '🛡️', reqLevel: 20, col: 0, row: 2, classType: 'Warrior', type: 'buff', mpCost: 20, cooldown: 600, duration: 1800 },
-    { id: 'Rush', name: '돌진', description: '전방으로 빠르게 돌진하여 적을 밀어냅니다.', maxLevel: 5, icon: '🏃', reqLevel: 20, col: 1, row: 2, classType: 'Warrior', type: 'active', mpCost: 15, cooldown: 120, damageMult: 1.5 },
-    { id: 'WeaponMastery', name: '무기 숙련', description: '무기 공격력이 증가합니다.', maxLevel: 10, icon: '⚔️', reqLevel: 20, col: 2, row: 2, classType: 'Warrior', type: 'passive' },
-    // Lv 30
-    { id: 'Shout', name: '위협', description: '고함을 질러 주변 적을 기절시킵니다.', maxLevel: 5, icon: '📢', reqLevel: 30, col: 0, row: 3, classType: 'Warrior', type: 'active', mpCost: 20, cooldown: 300, damageMult: 0.8 },
-    { id: 'Rage', name: '분노', description: '공격력을 대폭 증가시킵니다. (버프)', maxLevel: 5, icon: '😡', reqLevel: 30, col: 1, row: 3, classType: 'Warrior', type: 'buff', mpCost: 30, cooldown: 900, duration: 1200 },
-    { id: 'PowerGuard', name: '반격', description: '피격 시 일정 확률로 데미지를 반사합니다.', maxLevel: 5, icon: '💢', reqLevel: 30, col: 2, row: 3, classType: 'Warrior', type: 'passive' },
-    // Lv 40
-    { id: 'GroundSmash', name: '지면 강타', description: '땅을 내리찍어 넓은 범위에 충격을 줍니다.', maxLevel: 5, icon: '🔨', reqLevel: 40, col: 0, row: 4, classType: 'Warrior', type: 'active', mpCost: 40, cooldown: 180, damageMult: 3.5 },
-    { id: 'DragonBuster', name: '드래곤 버스터', description: '용의 힘으로 연속 공격을 퍼붓습니다.', maxLevel: 5, icon: '🐉', reqLevel: 40, col: 1, row: 4, classType: 'Warrior', type: 'active', mpCost: 50, cooldown: 180, damageMult: 5.5 },
-    { id: 'Achilles', name: '아킬레스', description: '영구적으로 방어력이 증가합니다.', maxLevel: 5, icon: '🦵', reqLevel: 40, col: 2, row: 4, classType: 'Warrior', type: 'passive' },
-    // Lv 50
-    { id: 'Brandish', name: '브랜디쉬', description: '전방의 적을 두 번 연속 베어버립니다.', maxLevel: 5, icon: '⚔️', reqLevel: 50, col: 0, row: 5, classType: 'Warrior', type: 'active', mpCost: 40, cooldown: 60, damageMult: 3.5 },
-    { id: 'Enrage', name: '광폭화', description: '짧은 시간 동안 공격력이 극대화됩니다.', maxLevel: 1, icon: '👺', reqLevel: 50, col: 1, row: 5, classType: 'Warrior', type: 'buff', mpCost: 100, cooldown: 1800, duration: 600 },
+    { id: 'SlashBlast', name: '슬래시 블러스트', description: '주변의 적들을 베어버립니다.', maxLevel: 10, icon: '🌪️', reqLevel: 1, col: 1, row: 1, classType: 'Warrior', type: 'active', mpCost: 10, cooldown: 60, damageMult: 2.5, reqSkill: 'PowerStrike' },
+    // Tier 2 (Lv 5)
+    { id: 'IronWall', name: '아이언 월', description: '방어력을 높여 받는 피해를 줄입니다. (버프)', maxLevel: 5, icon: '🛡️', reqLevel: 5, col: 0, row: 2, classType: 'Warrior', type: 'buff', mpCost: 20, cooldown: 600, duration: 1800 },
+    { id: 'Rush', name: '돌진', description: '전방으로 빠르게 돌진하여 적을 밀어냅니다.', maxLevel: 5, icon: '🏃', reqLevel: 5, col: 1, row: 2, classType: 'Warrior', type: 'active', mpCost: 15, cooldown: 120, damageMult: 1.5 },
+    { id: 'WeaponMastery', name: '무기 숙련', description: '무기 공격력이 증가합니다.', maxLevel: 10, icon: '⚔️', reqLevel: 5, col: 2, row: 2, classType: 'Warrior', type: 'passive' },
+    // Tier 3 (Lv 10)
+    { id: 'Shout', name: '위협', description: '고함을 질러 주변 적을 기절시킵니다.', maxLevel: 5, icon: '📢', reqLevel: 10, col: 0, row: 3, classType: 'Warrior', type: 'active', mpCost: 20, cooldown: 300, damageMult: 0.8 },
+    { id: 'Rage', name: '분노', description: '공격력을 대폭 증가시킵니다. (버프)', maxLevel: 5, icon: '😡', reqLevel: 10, col: 1, row: 3, classType: 'Warrior', type: 'buff', mpCost: 30, cooldown: 900, duration: 1200 },
+    { id: 'PowerGuard', name: '반격', description: '피격 시 일정 확률로 데미지를 반사합니다.', maxLevel: 5, icon: '💢', reqLevel: 10, col: 2, row: 3, classType: 'Warrior', type: 'passive' },
+    // Tier 4 (Lv 20)
+    { id: 'GroundSmash', name: '지면 강타', description: '땅을 내리찍어 넓은 범위에 충격을 줍니다.', maxLevel: 5, icon: '🔨', reqLevel: 20, col: 0, row: 4, classType: 'Warrior', type: 'active', mpCost: 40, cooldown: 180, damageMult: 3.5 },
+    { id: 'DragonBuster', name: '드래곤 버스터', description: '용의 힘으로 연속 공격을 퍼붓습니다.', maxLevel: 5, icon: '🐉', reqLevel: 20, col: 1, row: 4, classType: 'Warrior', type: 'active', mpCost: 50, cooldown: 180, damageMult: 5.5 },
+    { id: 'Achilles', name: '아킬레스', description: '영구적으로 방어력이 증가합니다.', maxLevel: 5, icon: '🦵', reqLevel: 20, col: 2, row: 4, classType: 'Warrior', type: 'passive' },
+    // Tier 5 (Lv 30)
+    { id: 'Brandish', name: '브랜디쉬', description: '전방의 적을 두 번 연속 베어버립니다.', maxLevel: 5, icon: '⚔️', reqLevel: 30, col: 0, row: 5, classType: 'Warrior', type: 'active', mpCost: 40, cooldown: 60, damageMult: 3.5 },
+    { id: 'Enrage', name: '광폭화', description: '짧은 시간 동안 공격력이 극대화됩니다.', maxLevel: 1, icon: '👺', reqLevel: 30, col: 1, row: 5, classType: 'Warrior', type: 'buff', mpCost: 100, cooldown: 1800, duration: 600 },
 
-    // === LANCER (Buffed Damage) ===
-    // Lv 10
+    // === LANCER ===
+    // Tier 1 (Lv 1)
     { id: 'DoubleStab', name: '더블 스탭', description: '창을 빠르게 두 번 찌릅니다.', maxLevel: 10, icon: '🥢', reqLevel: 1, col: 0, row: 1, classType: 'Lancer', type: 'active', mpCost: 5, cooldown: 30, damageMult: 1.8 },
-    { id: 'SpearCrusher', name: '스피어 크러셔', description: '창을 크게 휘둘러 다수를 공격합니다.', maxLevel: 10, icon: '🌬️', reqLevel: 10, col: 1, row: 1, classType: 'Lancer', type: 'active', mpCost: 15, cooldown: 60, damageMult: 2.5, reqSkill: 'DoubleStab' },
-    // Lv 20
-    { id: 'LeapAttack', name: '리프 어택', description: '높이 점프하여 강하게 내려찍습니다.', maxLevel: 5, icon: '🦗', reqLevel: 20, col: 0, row: 2, classType: 'Lancer', type: 'active', mpCost: 20, cooldown: 120, damageMult: 3.0 },
-    { id: 'Guard', name: '가드', description: '짧은 시간 동안 무적 상태가 됩니다.', maxLevel: 1, icon: '🙅', reqLevel: 20, col: 1, row: 2, classType: 'Lancer', type: 'active', mpCost: 15, cooldown: 300, damageMult: 0 },
-    { id: 'PolearmMastery', name: '창 숙련', description: '창 공격력과 명중률이 증가합니다.', maxLevel: 10, icon: '🔱', reqLevel: 20, col: 2, row: 2, classType: 'Lancer', type: 'passive' },
-    // Lv 30
-    { id: 'DragonRoar', name: '용의 포효', description: '화면 전체의 적을 위협하여 피해를 줍니다.', maxLevel: 5, icon: '🦁', reqLevel: 30, col: 0, row: 3, classType: 'Lancer', type: 'active', mpCost: 60, cooldown: 300, damageMult: 4.0 },
-    { id: 'DragonBlood', name: '용의 피', description: '체력을 서서히 소모하여 공격력을 올립니다.', maxLevel: 5, icon: '🩸', reqLevel: 30, col: 1, row: 3, classType: 'Lancer', type: 'buff', mpCost: 20, cooldown: 900, duration: 1200 },
-    { id: 'Reach', name: '리치', description: '창의 공격 범위가 증가합니다.', maxLevel: 5, icon: '📏', reqLevel: 30, col: 2, row: 3, classType: 'Lancer', type: 'passive' },
-    // Lv 40
-    { id: 'SpearPanic', name: '패닉', description: '적의 방어력을 무시하는 강력한 찌르기.', maxLevel: 5, icon: '😱', reqLevel: 40, col: 0, row: 4, classType: 'Lancer', type: 'active', mpCost: 30, cooldown: 120, damageMult: 5.5 },
-    { id: 'Sacrifice', name: '새크리파이스', description: '자신의 체력을 깎아 적에게 큰 피해를 줍니다.', maxLevel: 5, icon: '☠️', reqLevel: 40, col: 1, row: 4, classType: 'Lancer', type: 'active', mpCost: 0, cooldown: 60, damageMult: 7.0 },
-    // Lv 50
-    { id: 'DragonFury', name: '드래곤 퓨리', description: '체력이 일정 수준 이하일 때 공격력이 폭발합니다.', maxLevel: 5, icon: '🔥', reqLevel: 50, col: 0, row: 5, classType: 'Lancer', type: 'passive' },
-    { id: 'Earthquake', name: '지진', description: '땅을 뒤흔들어 광역 피해를 주고 느리게 합니다.', maxLevel: 5, icon: '🌋', reqLevel: 50, col: 1, row: 5, classType: 'Lancer', type: 'active', mpCost: 80, cooldown: 400, damageMult: 3.5 },
+    { id: 'SpearCrusher', name: '스피어 크러셔', description: '창을 크게 휘둘러 다수를 공격합니다.', maxLevel: 10, icon: '🌬️', reqLevel: 1, col: 1, row: 1, classType: 'Lancer', type: 'active', mpCost: 15, cooldown: 60, damageMult: 2.5, reqSkill: 'DoubleStab' },
+    // Tier 2 (Lv 5)
+    { id: 'LeapAttack', name: '리프 어택', description: '높이 점프하여 강하게 내려찍습니다.', maxLevel: 5, icon: '🦗', reqLevel: 5, col: 0, row: 2, classType: 'Lancer', type: 'active', mpCost: 20, cooldown: 120, damageMult: 3.0 },
+    { id: 'Guard', name: '가드', description: '짧은 시간 동안 무적 상태가 됩니다.', maxLevel: 1, icon: '🙅', reqLevel: 5, col: 1, row: 2, classType: 'Lancer', type: 'active', mpCost: 15, cooldown: 300, damageMult: 0 },
+    { id: 'PolearmMastery', name: '창 숙련', description: '창 공격력과 명중률이 증가합니다.', maxLevel: 10, icon: '🔱', reqLevel: 5, col: 2, row: 2, classType: 'Lancer', type: 'passive' },
+    // Tier 3 (Lv 10)
+    { id: 'DragonRoar', name: '용의 포효', description: '화면 전체의 적을 위협하여 피해를 줍니다.', maxLevel: 5, icon: '🦁', reqLevel: 10, col: 0, row: 3, classType: 'Lancer', type: 'active', mpCost: 60, cooldown: 300, damageMult: 4.0 },
+    { id: 'DragonBlood', name: '용의 피', description: '체력을 서서히 소모하여 공격력을 올립니다.', maxLevel: 5, icon: '🩸', reqLevel: 10, col: 1, row: 3, classType: 'Lancer', type: 'buff', mpCost: 20, cooldown: 900, duration: 1200 },
+    { id: 'Reach', name: '리치', description: '창의 공격 범위가 증가합니다.', maxLevel: 5, icon: '📏', reqLevel: 10, col: 2, row: 3, classType: 'Lancer', type: 'passive' },
+    // Tier 4 (Lv 20)
+    { id: 'SpearPanic', name: '패닉', description: '적의 방어력을 무시하는 강력한 찌르기.', maxLevel: 5, icon: '😱', reqLevel: 20, col: 0, row: 4, classType: 'Lancer', type: 'active', mpCost: 30, cooldown: 120, damageMult: 5.5 },
+    { id: 'Sacrifice', name: '새크리파이스', description: '자신의 체력을 깎아 적에게 큰 피해를 줍니다.', maxLevel: 5, icon: '☠️', reqLevel: 20, col: 1, row: 4, classType: 'Lancer', type: 'active', mpCost: 0, cooldown: 60, damageMult: 7.0 },
+    // Tier 5 (Lv 30)
+    { id: 'DragonFury', name: '드래곤 퓨리', description: '체력이 일정 수준 이하일 때 공격력이 폭발합니다.', maxLevel: 5, icon: '🔥', reqLevel: 30, col: 0, row: 5, classType: 'Lancer', type: 'passive' },
+    { id: 'Earthquake', name: '지진', description: '땅을 뒤흔들어 광역 피해를 주고 느리게 합니다.', maxLevel: 5, icon: '🌋', reqLevel: 30, col: 1, row: 5, classType: 'Lancer', type: 'active', mpCost: 80, cooldown: 400, damageMult: 3.5 },
 
-    // === ARCHER (ROW 1-5) ===
-    // Lv 10
+    // === ARCHER ===
+    // Tier 1 (Lv 1)
     { id: 'ArrowBlow', name: '애로우 블로우', description: '강력한 화살 한 발을 발사합니다.', maxLevel: 10, icon: '🏹', reqLevel: 1, col: 0, row: 1, classType: 'Archer', type: 'active', mpCost: 5, cooldown: 30, damageMult: 1.4 },
-    { id: 'MultiShot', name: '멀티 샷', description: '부채꼴 모양으로 여러 발의 화살을 쏩니다.', maxLevel: 10, icon: '📶', reqLevel: 10, col: 1, row: 1, classType: 'Archer', type: 'active', mpCost: 12, cooldown: 60, damageMult: 1.0, reqSkill: 'ArrowBlow' },
-    // Lv 20
-    { id: 'Backstep', name: '백스텝', description: '뒤로 빠르게 회피하며 화살을 쏩니다.', maxLevel: 1, icon: '🔙', reqLevel: 20, col: 0, row: 2, classType: 'Archer', type: 'active', mpCost: 10, cooldown: 120, damageMult: 1.0 },
-    { id: 'FireShot', name: '파이어 샷', description: '폭발하는 불화살을 쏘아 주변에 피해를 줍니다.', maxLevel: 5, icon: '🔥', reqLevel: 20, col: 1, row: 2, classType: 'Archer', type: 'active', mpCost: 20, cooldown: 90, damageMult: 2.5 },
-    { id: 'BowMastery', name: '활 숙련', description: '활 공격력과 사거리가 증가합니다.', maxLevel: 10, icon: '🎯', reqLevel: 20, col: 2, row: 2, classType: 'Archer', type: 'passive' },
-    // Lv 30
-    { id: 'IceShot', name: '아이스 샷', description: '적을 얼리는 빙결 화살을 발사합니다.', maxLevel: 5, icon: '❄️', reqLevel: 30, col: 0, row: 3, classType: 'Archer', type: 'active', mpCost: 25, cooldown: 120, damageMult: 2.0 },
-    { id: 'SnareTrap', name: '덫 설치', description: '적을 묶고 피해를 주는 덫을 설치합니다.', maxLevel: 5, icon: '🕸️', reqLevel: 30, col: 1, row: 3, classType: 'Archer', type: 'active', mpCost: 15, cooldown: 180, damageMult: 2.0 },
-    { id: 'Concentrate', name: '집중', description: '일시적으로 공격력과 회피율이 증가합니다. (버프)', maxLevel: 5, icon: '🧘‍♂️', reqLevel: 30, col: 2, row: 3, classType: 'Archer', type: 'buff', mpCost: 30, cooldown: 1200, duration: 900 },
-    // Lv 40
-    { id: 'ArrowRain', name: '폭풍의 시', description: '하늘에서 화살 비를 내리게 합니다.', maxLevel: 5, icon: '🌧️', reqLevel: 40, col: 0, row: 4, classType: 'Archer', type: 'active', mpCost: 50, cooldown: 240, damageMult: 2.5 },
-    { id: 'Phoenix', name: '피닉스', description: '불새를 소환하여 주변 적을 자동 공격합니다.', maxLevel: 5, icon: '🦅', reqLevel: 40, col: 1, row: 4, classType: 'Archer', type: 'active', mpCost: 60, cooldown: 600, damageMult: 1.5 },
-    // Lv 50
-    { id: 'Strafe', name: '스트레이프', description: '보이지 않는 속도로 4발의 화살을 연사합니다.', maxLevel: 5, icon: '🎰', reqLevel: 50, col: 0, row: 5, classType: 'Archer', type: 'active', mpCost: 30, cooldown: 60, damageMult: 0.8 },
-    { id: 'SharpEyes', name: '샤프 아이즈', description: '치명타 확률과 치명타 데미지가 증가합니다. (버프)', maxLevel: 5, icon: '👁️', reqLevel: 50, col: 1, row: 5, classType: 'Archer', type: 'buff', mpCost: 50, cooldown: 1800, duration: 1200 },
+    { id: 'MultiShot', name: '멀티 샷', description: '부채꼴 모양으로 여러 발의 화살을 쏩니다.', maxLevel: 10, icon: '📶', reqLevel: 1, col: 1, row: 1, classType: 'Archer', type: 'active', mpCost: 12, cooldown: 60, damageMult: 1.0, reqSkill: 'ArrowBlow' },
+    // Tier 2 (Lv 5)
+    { id: 'Backstep', name: '백스텝', description: '뒤로 빠르게 회피하며 화살을 쏩니다.', maxLevel: 1, icon: '🔙', reqLevel: 5, col: 0, row: 2, classType: 'Archer', type: 'active', mpCost: 10, cooldown: 120, damageMult: 1.0 },
+    { id: 'FireShot', name: '파이어 샷', description: '폭발하는 불화살을 쏘아 주변에 피해를 줍니다.', maxLevel: 5, icon: '🔥', reqLevel: 5, col: 1, row: 2, classType: 'Archer', type: 'active', mpCost: 20, cooldown: 90, damageMult: 2.5 },
+    { id: 'BowMastery', name: '활 숙련', description: '활 공격력과 사거리가 증가합니다.', maxLevel: 10, icon: '🎯', reqLevel: 5, col: 2, row: 2, classType: 'Archer', type: 'passive' },
+    // Tier 3 (Lv 10)
+    { id: 'IceShot', name: '아이스 샷', description: '적을 얼리는 빙결 화살을 발사합니다.', maxLevel: 5, icon: '❄️', reqLevel: 10, col: 0, row: 3, classType: 'Archer', type: 'active', mpCost: 25, cooldown: 120, damageMult: 2.0 },
+    { id: 'SnareTrap', name: '덫 설치', description: '적을 묶고 피해를 주는 덫을 설치합니다.', maxLevel: 5, icon: '🕸️', reqLevel: 10, col: 1, row: 3, classType: 'Archer', type: 'active', mpCost: 15, cooldown: 180, damageMult: 2.0 },
+    { id: 'Concentrate', name: '집중', description: '일시적으로 공격력과 회피율이 증가합니다. (버프)', maxLevel: 5, icon: '🧘‍♂️', reqLevel: 10, col: 2, row: 3, classType: 'Archer', type: 'buff', mpCost: 30, cooldown: 1200, duration: 900 },
+    // Tier 4 (Lv 20)
+    { id: 'ArrowRain', name: '폭풍의 시', description: '하늘에서 화살 비를 내리게 합니다.', maxLevel: 5, icon: '🌧️', reqLevel: 20, col: 0, row: 4, classType: 'Archer', type: 'active', mpCost: 50, cooldown: 240, damageMult: 2.5 },
+    { id: 'Phoenix', name: '피닉스', description: '불새를 소환하여 주변 적을 자동 공격합니다.', maxLevel: 5, icon: '🦅', reqLevel: 20, col: 1, row: 4, classType: 'Archer', type: 'active', mpCost: 60, cooldown: 600, damageMult: 1.5 },
+    // Tier 5 (Lv 30)
+    { id: 'Strafe', name: '스트레이프', description: '보이지 않는 속도로 4발의 화살을 연사합니다.', maxLevel: 5, icon: '🎰', reqLevel: 30, col: 0, row: 5, classType: 'Archer', type: 'active', mpCost: 30, cooldown: 60, damageMult: 0.8 },
+    { id: 'SharpEyes', name: '샤프 아이즈', description: '치명타 확률과 치명타 데미지가 증가합니다. (버프)', maxLevel: 5, icon: '👁️', reqLevel: 30, col: 1, row: 5, classType: 'Archer', type: 'buff', mpCost: 50, cooldown: 1800, duration: 1200 },
 
-    // === GUNNER (ROW 1-5) ===
-    // Lv 10
+    // === GUNNER ===
+    // Tier 1 (Lv 1)
     { id: 'DoubleShot', name: '더블 샷', description: '총알을 두 발 연속 발사합니다.', maxLevel: 10, icon: '🔫', reqLevel: 1, col: 0, row: 1, classType: 'Gunner', type: 'active', mpCost: 5, cooldown: 20, damageMult: 0.8 },
-    { id: 'Grenade', name: '수류탄', description: '폭발하는 수류탄을 투척합니다.', maxLevel: 5, icon: '💣', reqLevel: 10, col: 1, row: 1, classType: 'Gunner', type: 'active', mpCost: 20, cooldown: 120, damageMult: 3.0 },
-    // Lv 20
-    { id: 'Flamethrower', name: '화염방사기', description: '전방에 화염을 뿜어 지속 피해를 줍니다.', maxLevel: 5, icon: '🔥', reqLevel: 20, col: 0, row: 2, classType: 'Gunner', type: 'active', mpCost: 10, cooldown: 60, damageMult: 0.5 },
-    { id: 'C4', name: 'C4 설치', description: '지면에 닿으면 폭발하는 폭탄을 설치합니다.', maxLevel: 5, icon: '🧨', reqLevel: 20, col: 1, row: 2, classType: 'Gunner', type: 'active', mpCost: 15, cooldown: 180, damageMult: 4.0 },
-    { id: 'GunMastery', name: '총기 숙련', description: '총기 공격력과 사거리가 증가합니다.', maxLevel: 10, icon: '🔧', reqLevel: 20, col: 2, row: 2, classType: 'Gunner', type: 'passive' },
-    // Lv 30
-    { id: 'IceSplitter', name: '아이스 스플리터', description: '파편이 튀는 냉기탄을 쏘아 적을 얼립니다.', maxLevel: 5, icon: '❄️', reqLevel: 30, col: 0, row: 3, classType: 'Gunner', type: 'active', mpCost: 25, cooldown: 120, damageMult: 2.0 },
-    { id: 'Turret', name: '터렛 설치', description: '자동으로 적을 공격하는 터렛을 설치합니다.', maxLevel: 5, icon: '🤖', reqLevel: 30, col: 1, row: 3, classType: 'Gunner', type: 'active', mpCost: 40, cooldown: 600, damageMult: 1.0 },
-    { id: 'HomingMissile', name: '호밍 미사일', description: '적을 추적하는 미사일을 발사합니다.', maxLevel: 5, icon: '🚀', reqLevel: 30, col: 2, row: 3, classType: 'Gunner', type: 'active', mpCost: 30, cooldown: 150, damageMult: 3.5 },
-    // Lv 40
-    { id: 'RapidFire', name: '래피드 파이어', description: '보이지 않을 정도로 빠르게 난사합니다.', maxLevel: 5, icon: '🎰', reqLevel: 40, col: 0, row: 4, classType: 'Gunner', type: 'active', mpCost: 8, cooldown: 10, damageMult: 1.0 },
-    { id: 'AirStrike', name: '공중 폭격', description: '무전을 쳐서 공중 폭격을 요청합니다.', maxLevel: 5, icon: '✈️', reqLevel: 40, col: 1, row: 4, classType: 'Gunner', type: 'active', mpCost: 60, cooldown: 300, damageMult: 5.0 },
-    // Lv 50
-    { id: 'Battleship', name: '배틀쉽', description: '배틀쉽에 탑승하여 방어력과 공격력이 증가합니다. (버프)', maxLevel: 1, icon: '🚢', reqLevel: 50, col: 0, row: 5, classType: 'Gunner', type: 'buff', mpCost: 100, cooldown: 1800, duration: 1200 },
-    { id: 'LuckyDice', name: '럭키 다이스', description: '랜덤한 버프를 획득합니다.', maxLevel: 5, icon: '🎲', reqLevel: 50, col: 1, row: 5, classType: 'Gunner', type: 'buff', mpCost: 30, cooldown: 600, duration: 600 },
+    { id: 'Grenade', name: '수류탄', description: '폭발하는 수류탄을 투척합니다.', maxLevel: 5, icon: '💣', reqLevel: 1, col: 1, row: 1, classType: 'Gunner', type: 'active', mpCost: 20, cooldown: 120, damageMult: 3.0 },
+    // Tier 2 (Lv 5)
+    { id: 'Flamethrower', name: '화염방사기', description: '전방에 화염을 뿜어 지속 피해를 줍니다.', maxLevel: 5, icon: '🔥', reqLevel: 5, col: 0, row: 2, classType: 'Gunner', type: 'active', mpCost: 10, cooldown: 60, damageMult: 0.5 },
+    { id: 'C4', name: 'C4 설치', description: '지면에 닿으면 폭발하는 폭탄을 설치합니다.', maxLevel: 5, icon: '🧨', reqLevel: 5, col: 1, row: 2, classType: 'Gunner', type: 'active', mpCost: 15, cooldown: 180, damageMult: 4.0 },
+    { id: 'GunMastery', name: '총기 숙련', description: '총기 공격력과 사거리가 증가합니다.', maxLevel: 10, icon: '🔧', reqLevel: 5, col: 2, row: 2, classType: 'Gunner', type: 'passive' },
+    // Tier 3 (Lv 10)
+    { id: 'IceSplitter', name: '아이스 스플리터', description: '파편이 튀는 냉기탄을 쏘아 적을 얼립니다.', maxLevel: 5, icon: '❄️', reqLevel: 10, col: 0, row: 3, classType: 'Gunner', type: 'active', mpCost: 25, cooldown: 120, damageMult: 2.0 },
+    { id: 'Turret', name: '터렛 설치', description: '자동으로 적을 공격하는 터렛을 설치합니다.', maxLevel: 5, icon: '🤖', reqLevel: 10, col: 1, row: 3, classType: 'Gunner', type: 'active', mpCost: 40, cooldown: 600, damageMult: 1.0 },
+    { id: 'HomingMissile', name: '호밍 미사일', description: '적을 추적하는 미사일을 발사합니다.', maxLevel: 5, icon: '🚀', reqLevel: 10, col: 2, row: 3, classType: 'Gunner', type: 'active', mpCost: 30, cooldown: 150, damageMult: 3.5 },
+    // Tier 4 (Lv 20)
+    { id: 'RapidFire', name: '래피드 파이어', description: '보이지 않을 정도로 빠르게 난사합니다.', maxLevel: 5, icon: '🎰', reqLevel: 20, col: 0, row: 4, classType: 'Gunner', type: 'active', mpCost: 8, cooldown: 10, damageMult: 1.0 },
+    { id: 'AirStrike', name: '공중 폭격', description: '무전을 쳐서 공중 폭격을 요청합니다.', maxLevel: 5, icon: '✈️', reqLevel: 20, col: 1, row: 4, classType: 'Gunner', type: 'active', mpCost: 60, cooldown: 300, damageMult: 5.0 },
+    // Tier 5 (Lv 30)
+    { id: 'Battleship', name: '배틀쉽', description: '배틀쉽에 탑승하여 방어력과 공격력이 증가합니다. (버프)', maxLevel: 1, icon: '🚢', reqLevel: 30, col: 0, row: 5, classType: 'Gunner', type: 'buff', mpCost: 100, cooldown: 1800, duration: 1200 },
+    { id: 'LuckyDice', name: '럭키 다이스', description: '랜덤한 버프를 획득합니다.', maxLevel: 5, icon: '🎲', reqLevel: 30, col: 1, row: 5, classType: 'Gunner', type: 'buff', mpCost: 30, cooldown: 600, duration: 600 },
 
-    // === MAGE (ROW 1-5) ===
-    // Lv 10
+    // === MAGE ===
+    // Tier 1 (Lv 1)
     { id: 'MagicClaw', name: '매직 클로', description: '마법의 손톱으로 적을 할큅니다.', maxLevel: 10, icon: '🖐️', reqLevel: 1, col: 0, row: 1, classType: 'Mage', type: 'active', mpCost: 8, cooldown: 30, damageMult: 1.3 },
-    { id: 'Thunderbolt', name: '썬더볼트', description: '주변 적들에게 번개를 내리꽂습니다.', maxLevel: 10, icon: '⚡', reqLevel: 10, col: 1, row: 1, classType: 'Mage', type: 'active', mpCost: 25, cooldown: 60, damageMult: 1.5 },
-    // Lv 20
-    { id: 'Heal', name: '힐', description: '자신의 체력을 회복합니다.', maxLevel: 5, icon: '💖', reqLevel: 20, col: 0, row: 2, classType: 'Mage', type: 'active', mpCost: 30, cooldown: 300, damageMult: 0 },
-    { id: 'ColdBeam', name: '콜드 빔', description: '적을 얼리는 얼음 기둥을 소환합니다.', maxLevel: 5, icon: '🧊', reqLevel: 20, col: 1, row: 2, classType: 'Mage', type: 'active', mpCost: 20, cooldown: 90, damageMult: 2.0 },
-    { id: 'MPRestore', name: 'MP 회복력 향상', description: 'MP 회복 속도가 빨라집니다.', maxLevel: 10, icon: '🧘', reqLevel: 20, col: 2, row: 2, classType: 'Mage', type: 'passive' },
-    // Lv 30
-    { id: 'Teleport', name: '텔레포트', description: '일정 거리를 순간이동합니다.', maxLevel: 1, icon: '🌀', reqLevel: 30, col: 0, row: 3, classType: 'Mage', type: 'active', mpCost: 20, cooldown: 30, damageMult: 0 },
-    { id: 'FireBall', name: '파이어볼', description: '폭발하는 화염구를 발사합니다.', maxLevel: 5, icon: '☄️', reqLevel: 30, col: 1, row: 3, classType: 'Mage', type: 'active', mpCost: 30, cooldown: 90, damageMult: 3.0 },
-    { id: 'MagicGuard', name: '매직 가드', description: '받는 피해의 일부를 MP로 대신합니다. (패시브)', maxLevel: 5, icon: '🛡️', reqLevel: 30, col: 2, row: 3, classType: 'Mage', type: 'passive' },
-    // Lv 40
-    { id: 'Meteor', name: '메테오', description: '거대한 운석을 소환하여 전장을 초토화합니다.', maxLevel: 5, icon: '🌠', reqLevel: 40, col: 0, row: 4, classType: 'Mage', type: 'active', mpCost: 100, cooldown: 400, damageMult: 10.0 },
-    { id: 'Slow', name: '슬로우', description: '주변 적들의 이동속도를 느리게 합니다.', maxLevel: 5, icon: '🐢', reqLevel: 40, col: 1, row: 4, classType: 'Mage', type: 'active', mpCost: 40, cooldown: 300, damageMult: 0 },
-    // Lv 50
-    { id: 'Blizzard', name: '블리자드', description: '화면 전체에 눈보라를 일으켜 적을 얼립니다.', maxLevel: 5, icon: '🌨️', reqLevel: 50, col: 0, row: 5, classType: 'Mage', type: 'active', mpCost: 120, cooldown: 500, damageMult: 8.0 },
-    { id: 'Bahamut', name: '바하뮤트', description: '성스러운 용을 소환하여 적을 공격합니다.', maxLevel: 5, icon: '🐉', reqLevel: 50, col: 1, row: 5, classType: 'Mage', type: 'active', mpCost: 100, cooldown: 900, damageMult: 2.0 },
+    { id: 'Thunderbolt', name: '썬더볼트', description: '주변 적들에게 번개를 내리꽂습니다.', maxLevel: 10, icon: '⚡', reqLevel: 1, col: 1, row: 1, classType: 'Mage', type: 'active', mpCost: 25, cooldown: 60, damageMult: 1.5 },
+    // Tier 2 (Lv 5)
+    { id: 'Heal', name: '힐', description: '자신의 체력을 회복합니다.', maxLevel: 5, icon: '💖', reqLevel: 5, col: 0, row: 2, classType: 'Mage', type: 'active', mpCost: 30, cooldown: 300, damageMult: 0 },
+    { id: 'ColdBeam', name: '콜드 빔', description: '적을 얼리는 얼음 기둥을 소환합니다.', maxLevel: 5, icon: '🧊', reqLevel: 5, col: 1, row: 2, classType: 'Mage', type: 'active', mpCost: 20, cooldown: 90, damageMult: 2.0 },
+    { id: 'MPRestore', name: 'MP 회복력 향상', description: 'MP 회복 속도가 빨라집니다.', maxLevel: 10, icon: '🧘', reqLevel: 5, col: 2, row: 2, classType: 'Mage', type: 'passive' },
+    // Tier 3 (Lv 10)
+    { id: 'Teleport', name: '텔레포트', description: '일정 거리를 순간이동합니다.', maxLevel: 1, icon: '🌀', reqLevel: 10, col: 0, row: 3, classType: 'Mage', type: 'active', mpCost: 20, cooldown: 30, damageMult: 0 },
+    { id: 'FireBall', name: '파이어볼', description: '폭발하는 화염구를 발사합니다.', maxLevel: 5, icon: '☄️', reqLevel: 10, col: 1, row: 3, classType: 'Mage', type: 'active', mpCost: 30, cooldown: 90, damageMult: 3.0 },
+    { id: 'MagicGuard', name: '매직 가드', description: '받는 피해의 일부를 MP로 대신합니다. (패시브)', maxLevel: 5, icon: '🛡️', reqLevel: 10, col: 2, row: 3, classType: 'Mage', type: 'passive' },
+    // Tier 4 (Lv 20)
+    { id: 'Meteor', name: '메테오', description: '거대한 운석을 소환하여 전장을 초토화합니다.', maxLevel: 5, icon: '🌠', reqLevel: 20, col: 0, row: 4, classType: 'Mage', type: 'active', mpCost: 100, cooldown: 400, damageMult: 10.0 },
+    { id: 'Slow', name: '슬로우', description: '주변 적들의 이동속도를 느리게 합니다.', maxLevel: 5, icon: '🐢', reqLevel: 20, col: 1, row: 4, classType: 'Mage', type: 'active', mpCost: 40, cooldown: 300, damageMult: 0 },
+    // Tier 5 (Lv 30)
+    { id: 'Blizzard', name: '블리자드', description: '화면 전체에 눈보라를 일으켜 적을 얼립니다.', maxLevel: 5, icon: '🌨️', reqLevel: 30, col: 0, row: 5, classType: 'Mage', type: 'active', mpCost: 120, cooldown: 500, damageMult: 8.0 },
+    { id: 'Bahamut', name: '바하뮤트', description: '성스러운 용을 소환하여 적을 공격합니다.', maxLevel: 5, icon: '🐉', reqLevel: 30, col: 1, row: 5, classType: 'Mage', type: 'active', mpCost: 100, cooldown: 900, damageMult: 2.0 },
 ];
 
 export const DEFAULT_KEY_BINDINGS: KeyBindings = {
@@ -275,10 +278,10 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
 };
 
 export const DEFAULT_MOBILE_SETTINGS: MobileControlSettings = {
-    dpadX: 5,
-    dpadY: 5,
-    actionX: 5,
-    actionY: 5,
-    scale: 1.2,
+    dpadX: 7, 
+    dpadY: 7,
+    actionX: 7, 
+    actionY: 7,
+    scale: 1.1, 
     opacity: 0.8
 };

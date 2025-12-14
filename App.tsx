@@ -6,11 +6,10 @@ import ShopModal from './components/ShopModal';
 import WorldMap from './components/WorldMap';
 import SkillTreeModal from './components/SkillTreeModal';
 import SettingsModal from './components/SettingsModal';
-import ImageEditorModal from './components/ImageEditorModal';
 import ClassSelectionModal from './components/ClassSelectionModal';
 import MobileControls from './components/MobileControls';
 import { Player, Quest, Enemy, WeaponType, KeyBindings, ClassType, MobileControlSettings } from './types';
-import { generateQuest } from './services/geminiService';
+import { generateStaticQuest } from './services/gameService';
 import { UPGRADE_COSTS, BIOMES, DEFAULT_KEY_BINDINGS, CLASS_INFOS, ADVANCED_CLASS_NAMES, DEFAULT_MOBILE_SETTINGS } from './constants';
 
 const App: React.FC = () => {
@@ -33,7 +32,6 @@ const App: React.FC = () => {
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isSkillsOpen, setIsSkillsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
   
   // Layout State
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -41,14 +39,12 @@ const App: React.FC = () => {
   const [stageInfo, setStageInfo] = useState({ level: 1, name: 'Peaceful Forest' });
   const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
   const [mobileSettings, setMobileSettings] = useState<MobileControlSettings>(DEFAULT_MOBILE_SETTINGS);
-  const [customBackground, setCustomBackground] = useState<string | null>(null);
   
   const [scale, setScale] = useState(1);
   const [isPortrait, setIsPortrait] = useState(false);
 
   // Derived state for game loop
-  // CRITICAL FIX: Include mobileMenuOpen in isPaused so game stops when menu is open
-  const isPaused = isShopOpen || isMapOpen || isSkillsOpen || isSettingsOpen || isImageEditorOpen || isClassSelectionOpen || mobileMenuOpen;
+  const isPaused = isShopOpen || isMapOpen || isSkillsOpen || isSettingsOpen || isClassSelectionOpen || mobileMenuOpen;
   const gameActive = gameStarted && !isGameOver && !isPaused;
 
   const currentQuestRef = useRef<Quest | null>(null);
@@ -132,14 +128,14 @@ const App: React.FC = () => {
       setPlayerStats(null); 
       setGameResetKey(prev => prev + 1); 
       setIsClassSelectionOpen(true);
-      setMobileMenuOpen(false); // Close menu on restart
+      setMobileMenuOpen(false); 
   }, []);
 
   const handleQuestUpdate = useCallback((newCount: number) => {
       setCurrentQuest(prev => prev ? { ...prev, currentCount: newCount } : null);
   }, []);
 
-  const handleGenerateQuest = async (stageOverride?: number) => {
+  const handleGenerateQuest = (stageOverride?: number) => {
     const player = playerStatsRef.current;
     if (!player) return;
     setLoadingQuest(true);
@@ -147,10 +143,9 @@ const App: React.FC = () => {
     const targetStage = stageOverride !== undefined ? stageOverride : stageInfo.level;
 
     try {
-      const newQuest = await generateQuest(
+      // Use static generator instead of AI
+      const newQuest = generateStaticQuest(
         player.level, 
-        player.classType, 
-        "",
         targetStage
       );
       setCurrentQuest(newQuest);
@@ -181,14 +176,6 @@ const App: React.FC = () => {
   const handleOpenSettings = () => setIsSettingsOpen(true);
   const handleCloseSettings = () => setIsSettingsOpen(false);
   
-  const handleOpenImageEditor = () => { setIsImageEditorOpen(true); };
-  const handleCloseImageEditor = () => setIsImageEditorOpen(false);
-  const handleApplyBackground = (imageUrl: string) => {
-      setCustomBackground(imageUrl);
-      addLog("새로운 배경이 적용되었습니다.");
-      setIsImageEditorOpen(false);
-  };
-
   const handlePurchase = (type: 'POTION_HP' | 'POTION_MP' | 'UPGRADE_ATK' | 'UPGRADE_HP' | 'UPGRADE_MP') => {
       if (!gameRef.current || !playerStats) return;
       let success = false;
@@ -237,20 +224,20 @@ const App: React.FC = () => {
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if (!gameStarted) return;
-          if (!isSettingsOpen && !isImageEditorOpen) {
+          if (!isSettingsOpen) {
               if (e.code === keyBindings.MENU_SHOP) setIsShopOpen(prev => !prev);
               if (e.code === keyBindings.MENU_MAP) setIsMapOpen(prev => !prev);
               if (e.code === keyBindings.MENU_SKILL) setIsSkillsOpen(prev => !prev);
           }
           if (e.code === 'Escape') {
               setIsShopOpen(false); setIsMapOpen(false); setIsSkillsOpen(false);
-              setIsSettingsOpen(false); setIsImageEditorOpen(false);
-              setMobileMenuOpen(false); // Also close mobile menu
+              setIsSettingsOpen(false);
+              setMobileMenuOpen(false);
           }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameStarted, isSettingsOpen, isImageEditorOpen, keyBindings]);
+  }, [gameStarted, isSettingsOpen, keyBindings]);
   
   useEffect(() => {
     if (gameStarted && !currentQuest && playerStats && playerStats.level === 1 && !loadingQuest) {
@@ -266,16 +253,12 @@ const App: React.FC = () => {
 
     if (newBiomeIndex !== prevBiomeIndexRef.current) {
         prevBiomeIndexRef.current = newBiomeIndex;
-        if (customBackground) {
-            setCustomBackground(null);
-            addLog("새로운 지역에 도착했습니다.");
-        }
         if (currentQuestRef.current && !currentQuestRef.current.isCompleted) {
              addLog("⚠️ 지역이 변경되어 퀘스트가 갱신됩니다.");
              handleGenerateQuest(currentStageLevel);
         }
     }
-  }, [stageInfo.level, gameStarted, customBackground]);
+  }, [stageInfo.level, gameStarted]);
 
   const handleSimulateKey = (code: string, type: 'keydown' | 'keyup') => {
       window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
@@ -308,7 +291,6 @@ const App: React.FC = () => {
           gameActive={gameActive}
           currentQuest={currentQuest}
           keyBindings={keyBindings}
-          backgroundImage={customBackground}
           initialClass={playerStats?.classType}
         />
         {playerStats && (
@@ -324,14 +306,12 @@ const App: React.FC = () => {
             onOpenMap={handleOpenMap}
             onOpenSkills={handleOpenSkills}
             onOpenSettings={handleOpenSettings}
-            onOpenImageEditor={handleOpenImageEditor}
             onSwitchWeapon={handleSwitchWeapon}
             stageLevel={stageInfo.level}
             biomeName={stageInfo.name}
             keyBindings={keyBindings}
             onJobAdvance={handleJobAdvance}
             showVirtualControls={!isPortrait} 
-            // Control Menu State here in App
             forceMenuOpen={mobileMenuOpen}
             onCloseMenu={() => setMobileMenuOpen(false)}
             mobileSettings={mobileSettings}
@@ -344,7 +324,6 @@ const App: React.FC = () => {
         {isMapOpen && playerStats && <WorldMap currentStage={stageInfo.level} maxStageReached={playerStats.maxStageReached} onClose={handleCloseMap} />}
         {isSkillsOpen && playerStats && <SkillTreeModal player={playerStats} onClose={handleCloseSkills} onUpgrade={handleUpgradeSkill} onAssignSlot={handleAssignSkillSlot} keyBindings={keyBindings} />}
         {isSettingsOpen && <SettingsModal bindings={keyBindings} onSave={setKeyBindings} mobileSettings={mobileSettings} onSaveMobileSettings={setMobileSettings} onClose={handleCloseSettings} onUnlockAll={handleUnlockAll} />}
-        {isImageEditorOpen && <ImageEditorModal onClose={handleCloseImageEditor} onApplyBackground={handleApplyBackground} />}
         
         {isPaused && !isGameOver && !isClassSelectionOpen && (
             <div className="absolute top-4 right-4 bg-yellow-500 text-black font-bold px-3 py-1 rounded shadow animate-pulse pointer-events-none z-40">

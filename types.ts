@@ -71,6 +71,7 @@ export interface Enemy extends Entity {
   freezeTimer: number; 
   stunTimer: number;   
   isRanged: boolean; 
+  deathTimer?: number; // Added for fade out animation
 }
 
 export interface Projectile extends Rect {
@@ -101,13 +102,20 @@ export interface Particle {
   id: string;
   x: number;
   y: number;
-  text: string;
+  text: string; // Used for Emoji or Text
   color: string;
   life: number;
   maxLife: number;
   vx: number; 
   vy: number;
   scale?: number; 
+  // Visual Effect Props
+  shape?: 'text' | 'circle' | 'slash' | 'ring' | 'lightning' | 'pillar';
+  width?: number;
+  height?: number;
+  rotation?: number;
+  targetX?: number; // For lightning/beam
+  targetY?: number;
 }
 
 export interface Item extends Rect {
