@@ -70,7 +70,7 @@ export const ENEMY_TYPES = {
   Dragon: { emoji: '🐉', hp: 3000, damage: 100, exp: 2000, width: 120, height: 90, speed: 2, dropName: '용의 비늘', dropEmoji: '🛡️', isRanged: true, projectile: '☄️' },
   Zombie: { emoji: '🧟', hp: 1500, damage: 80, exp: 900, width: 50, height: 70, speed: 1, dropName: '썩은 붕대', dropEmoji: '🧻', isRanged: false },
   Demon: { emoji: '👹', hp: 2000, damage: 90, exp: 1200, width: 60, height: 70, speed: 2.5, dropName: '악마의 뿔', dropEmoji: '😈', isRanged: false }
-};
+];
 
 export const WEAPONS: Record<string, { emoji: string, range: number, damageMult: number, cooldown: number, speed: number, type: 'melee' | 'ranged', projectile?: string }> = {
   // Basic Weapons
@@ -278,10 +278,10 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
 };
 
 export const DEFAULT_MOBILE_SETTINGS: MobileControlSettings = {
-    dpadX: 7, 
-    dpadY: 7,
-    actionX: 7, 
-    actionY: 7,
+    dpadX: 2, 
+    dpadY: 2,
+    actionX: 2, 
+    actionY: 2,
     scale: 1.1, 
     opacity: 0.8
 };

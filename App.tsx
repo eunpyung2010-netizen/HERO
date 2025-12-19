@@ -35,6 +35,7 @@ const App: React.FC = () => {
   
   // Layout State
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [enableVirtualControls, setEnableVirtualControls] = useState(false);
   
   const [stageInfo, setStageInfo] = useState({ level: 1, name: 'Peaceful Forest' });
   const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
@@ -265,10 +266,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-[100dvh] bg-black overflow-hidden select-none flex flex-col relative touch-none">
+    <div className={`w-full h-[100dvh] bg-black overflow-hidden select-none flex flex-col relative touch-none ${isPortrait ? 'pt-12' : ''}`}>
       <div 
         className={`shadow-2xl bg-slate-800 overflow-hidden flex-shrink-0 transition-transform duration-0 z-0
-            ${isPortrait ? 'origin-top-left' : 'absolute top-1/2 left-1/2 origin-center'}
+            ${isPortrait ? 'origin-top-left mx-auto' : 'absolute top-1/2 left-1/2 origin-center'}
         `}
         style={{ 
             width: 1024, 
@@ -277,7 +278,8 @@ const App: React.FC = () => {
                 ? `scale(${scale})` 
                 : `translate(-50%, -50%) scale(${scale})`, 
             marginBottom: isPortrait ? `-${600 - (600 * scale)}px` : 0,
-            marginRight: isPortrait ? `-${1024 - (1024 * scale)}px` : 0 
+            // Remove negative right margin for portrait centered
+            marginRight: isPortrait ? 0 : 0 
         }}
       >
         <GameCanvas 
@@ -315,11 +317,20 @@ const App: React.FC = () => {
             forceMenuOpen={mobileMenuOpen}
             onCloseMenu={() => setMobileMenuOpen(false)}
             mobileSettings={mobileSettings}
+            forceVirtualControls={enableVirtualControls}
           />
         )}
 
         {/* Modals */}
-        {isClassSelectionOpen && <div className="absolute inset-0 z-50"><ClassSelectionModal onSelectClass={handleClassSelect} /></div>}
+        {isClassSelectionOpen && (
+            <div className="absolute inset-0 z-50">
+                <ClassSelectionModal 
+                    onSelectClass={handleClassSelect} 
+                    virtualControlsEnabled={enableVirtualControls}
+                    onToggleVirtualControls={() => setEnableVirtualControls(prev => !prev)}
+                />
+            </div>
+        )}
         {isShopOpen && playerStats && <ShopModal player={playerStats} onClose={handleCloseShop} onPurchase={handlePurchase} />}
         {isMapOpen && playerStats && <WorldMap currentStage={stageInfo.level} maxStageReached={playerStats.maxStageReached} onClose={handleCloseMap} />}
         {isSkillsOpen && playerStats && <SkillTreeModal player={playerStats} onClose={handleCloseSkills} onUpgrade={handleUpgradeSkill} onAssignSlot={handleAssignSkillSlot} keyBindings={keyBindings} />}
