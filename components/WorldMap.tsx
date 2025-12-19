@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BIOMES } from '../constants';
 import { X, Lock, MapPin, Star } from 'lucide-react';
@@ -10,7 +11,7 @@ interface WorldMapProps {
 
 const WorldMap: React.FC<WorldMapProps> = ({ currentStage, maxStageReached, onClose }) => {
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300 touch-auto">
             <div className="bg-slate-900 border-2 border-yellow-600 rounded-2xl shadow-2xl w-full max-w-4xl h-full md:h-[80%] flex flex-col overflow-hidden relative">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-yellow-800 to-yellow-900 p-4 flex justify-between items-center border-b border-yellow-500 shadow-md z-10 flex-shrink-0">

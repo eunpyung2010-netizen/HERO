@@ -25,10 +25,11 @@ interface UIOverlayProps {
   forceMenuOpen?: boolean;
   onCloseMenu?: () => void;
   mobileSettings?: MobileControlSettings;
+  forceVirtualControls?: boolean;
 }
 
 const UIOverlay: React.FC<UIOverlayProps> = ({ 
-  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu, mobileSettings
+  player, boss, currentQuest, logs, onGenerateQuest, loadingQuest, onRestart, onOpenShop, onOpenMap, onOpenSkills, onOpenSettings, onSwitchWeapon, onJobAdvance, stageLevel, biomeName, keyBindings, showVirtualControls = true, forceMenuOpen, onCloseMenu, mobileSettings, forceVirtualControls = false
 }) => {
   const hpPercent = (player.hp / player.maxHp) * 100;
   const mpPercent = (player.mp / player.maxMp) * 100;
@@ -136,6 +137,10 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
       displayWeapons.push(...advanced);
   }
 
+  // Controls Visibility: If forceVirtualControls is true, we remove the lg:hidden class constraint
+  const visibilityClass = forceVirtualControls ? '' : 'lg:hidden';
+  const showControls = showVirtualControls || forceVirtualControls;
+
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none flex flex-col justify-between p-4 pb-safe pl-safe pr-safe">
       
@@ -162,7 +167,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
         
         {/* LEFT: Player Status */}
         {/* Added scale-75 for mobile to reduce overlap */}
-        <div className={`flex gap-2 md:gap-3 mt-2 md:mt-0 origin-top-left ${showVirtualControls ? 'scale-75' : 'scale-90 md:scale-100'}`}>
+        <div className={`flex gap-2 md:gap-3 mt-2 md:mt-0 origin-top-left ${showControls ? 'scale-75' : 'scale-90 md:scale-100'}`}>
              <div className="relative">
                  <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-800 border-2 border-slate-600 rounded-lg flex items-center justify-center text-3xl md:text-4xl shadow-lg z-10 relative">
                      {player.emoji}
@@ -195,7 +200,6 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                     </div>
                  </div>
 
-                 {/* EXP BAR RESTORED */}
                  <div className="relative h-2 md:h-2.5 bg-slate-900/90 rounded-sm border border-slate-600 mt-0.5 overflow-hidden shadow-inner group" title={`EXP: ${player.exp} / ${player.maxExp}`}>
                     <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-200 transition-all duration-300" style={{ width: `${Math.min(100, expPercent)}%` }} />
                     <div className="absolute inset-0 flex items-center justify-center text-[7px] md:text-[8px] font-black text-black/70 z-10 tracking-widest">
@@ -205,9 +209,9 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
              </div>
         </div>
 
-        {/* CENTER: Stage Info (Hidden on very small screens in landscape to save space) */}
-        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 top-4 flex-col items-center pointer-events-none">
-            <div className="bg-black/60 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 mb-1">
+        {/* CENTER: Stage Info */}
+        <div className="absolute left-1/2 -translate-x-1/2 top-4 flex flex-col items-center pointer-events-none scale-75 md:scale-100 origin-top">
+            <div className="bg-black/60 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 mb-1 shadow-lg">
                 <span className="text-yellow-400 font-bold text-xs tracking-[0.2em]">STAGE {stageLevel}</span>
             </div>
             <div className="text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide">
@@ -225,8 +229,8 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
 
         {/* RIGHT: Menu Buttons */}
         <div className="flex flex-col items-end gap-3 mt-2 md:mt-0">
-             {/* Desktop Menu - Hidden on Mobile */}
-             <div className="hidden lg:flex gap-2">
+             {/* Desktop Menu - Hidden on Mobile unless forced */}
+             <div className={`hidden lg:flex gap-2`}>
                  <button 
                     onClick={onRestart}
                     className="bg-red-900/80 hover:bg-red-800 text-white p-2 rounded-lg border border-red-700 shadow-lg active:scale-95 transition-all group"
@@ -277,10 +281,15 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                  </button>
              </div>
              
-             {/* Mobile Menu & Potions - Visible on Mobile landscape */}
-             {showVirtualControls && (
-                 <div className="lg:hidden pointer-events-auto flex gap-2 items-center absolute top-4 right-4">
-                     {/* Mobile Potions (Moved from MobileControls to Overlay) */}
+             {/* Mobile Menu & Potions (Landscape) */}
+             {showControls && (
+                 <div className={`${visibilityClass} pointer-events-auto flex gap-2 items-center absolute top-4 right-4 z-50`}>
+                     {/* Gold Display */}
+                     <div className="bg-black/60 px-3 py-1.5 rounded-full border border-yellow-600/50 flex items-center gap-1 backdrop-blur-md">
+                         <span className="text-[10px] md:text-xs text-yellow-400 font-bold">💰 {player.gold.toLocaleString()}</span>
+                     </div>
+
+                     {/* Potions */}
                      <button
                         onPointerDown={(e) => { e.preventDefault(); simulateKey(keyBindings.POTION_HP, 'keydown'); }}
                         className="w-10 h-10 bg-red-950 border border-red-600 rounded-full flex items-center justify-center active:scale-95 relative"
@@ -300,7 +309,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                         onPointerDown={(e) => { 
                             e.preventDefault(); 
                             e.stopPropagation();
-                            if (onCloseMenu) onCloseMenu(); // This toggles it in parent
+                            if (onCloseMenu) onCloseMenu(); 
                         }}
                         className="bg-slate-800/80 hover:bg-slate-700 text-white p-2 rounded-full border border-slate-500/50 shadow-xl active:scale-95 transition-all backdrop-blur-sm ml-2"
                      >
@@ -391,15 +400,15 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
           </div>
       )}
 
-      {/* VIRTUAL CONTROLS FOR MOBILE (LANDSCAPE ONLY) */}
-      {showVirtualControls && (
-          <div className="lg:hidden fixed inset-0 pointer-events-none z-40" style={{ opacity: settings.opacity }}>
+      {/* VIRTUAL CONTROLS FOR MOBILE (LANDSCAPE ONLY OR FORCED) */}
+      {showControls && (
+          <div className={`${visibilityClass} fixed inset-0 pointer-events-none z-40`} style={{ opacity: settings.opacity }}>
                {/* D-Pad (Left) - Enhanced MOBA Style */}
                <div 
                     className="absolute pointer-events-auto"
                     style={{ 
-                        left: `${settings.dpadX + 5}%`, 
-                        bottom: `${settings.dpadY + 10}%`,
+                        left: `${settings.dpadX}%`, 
+                        bottom: `${settings.dpadY + 2}%`,
                         transform: `scale(${settings.scale})`
                     }}
                >
@@ -408,10 +417,11 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-slate-700/50 rounded-full border border-white/5"></div>
                         
                         {/* Directional Buttons */}
-                        <MobileButton code={keyBindings.UP} icon={ArrowUp} size={60} className="top-1 left-1/2 -translate-x-1/2" />
+                        {/* UP is now JUMP */}
+                        <MobileButton code={keyBindings.JUMP} icon={ChevronsUp} size={60} className="top-1 left-1/2 -translate-x-1/2" />
                         <MobileButton code={keyBindings.LEFT} icon={ArrowLeft} size={60} className="left-1 top-1/2 -translate-y-1/2" />
                         <MobileButton code={keyBindings.RIGHT} icon={ArrowRight} size={60} className="right-1 top-1/2 -translate-y-1/2" />
-                        <MobileButton code={keyBindings.DOWN} icon={ArrowDown} size={60} className="bottom-1 left-1/2 -translate-x-1/2" />
+                        {/* Down button removed */}
                     </div>
                </div>
 
@@ -419,8 +429,8 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                <div 
                     className="absolute pointer-events-auto"
                     style={{ 
-                        right: `${settings.actionX + 5}%`, 
-                        bottom: `${settings.actionY + 8}%`,
+                        right: `${settings.actionX}%`, 
+                        bottom: `${settings.actionY + 2}%`,
                         transform: `scale(${settings.scale})`
                     }}
                >
@@ -435,47 +445,47 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
                             className="z-20"
                         />
                         
-                        {/* Jump - Secondary, slightly inward */}
+                        {/* Secondary Button - Previously Jump, Now MAGIC A (Skill 1) */}
                         <MobileButton 
-                            code={keyBindings.JUMP} 
-                            icon={ChevronsUp} 
+                            code={keyBindings.SKILL_1} 
+                            label="A"
                             size={70}
-                            color="bg-blue-600/70 border-blue-400 shadow-blue-900/50"
+                            color="bg-indigo-600/70 border-indigo-400 shadow-indigo-900/50"
                             style={{ right: 100, bottom: 20 }}
                             className="z-10"
                         />
 
                         {/* Skills Arc */}
-                        {/* Skill 1 (A) */}
-                        <MobileButton 
-                            code={keyBindings.SKILL_1} 
-                            label="A"
-                            size={50}
-                            color="bg-indigo-600/60 border-indigo-400"
-                            style={{ right: 20, bottom: 110 }}
-                        />
                         {/* Skill 2 (S) */}
                         <MobileButton 
                             code={keyBindings.SKILL_2} 
                             label="S"
                             size={50}
                             color="bg-indigo-600/60 border-indigo-400"
-                            style={{ right: 80, bottom: 100 }}
+                            style={{ right: 20, bottom: 110 }}
                         />
-                         {/* Skill 3 (D) */}
+                        {/* Skill 3 (D) */}
                         <MobileButton 
                             code={keyBindings.SKILL_3} 
                             label="D"
                             size={50}
                             color="bg-indigo-600/60 border-indigo-400"
-                            style={{ right: 130, bottom: 80 }}
+                            style={{ right: 80, bottom: 100 }}
                         />
-                         {/* Skill 4 (F) - Further out */}
+                         {/* Skill 4 (F) */}
                         <MobileButton 
                             code={keyBindings.SKILL_4} 
                             label="F"
-                            size={45}
+                            size={50}
                             color="bg-purple-600/60 border-purple-400"
+                            style={{ right: 130, bottom: 80 }}
+                        />
+                         {/* Skill 5 (G) */}
+                        <MobileButton 
+                            code={keyBindings.SKILL_5} 
+                            label="G"
+                            size={45}
+                            color="bg-pink-600/60 border-pink-400"
                             style={{ right: 170, bottom: 40 }}
                         />
                     </div>

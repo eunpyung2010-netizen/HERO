@@ -2,13 +2,15 @@
 import React, { useState } from 'react';
 import { ClassType } from '../types';
 import { CLASS_INFOS } from '../constants';
-import { Sword, Shield, Zap, Target, MousePointer2, ChevronRight, Star } from 'lucide-react';
+import { Sword, Shield, Zap, Target, MousePointer2, ChevronRight, Star, Gamepad2 } from 'lucide-react';
 
 interface ClassSelectionModalProps {
     onSelectClass: (classType: ClassType) => void;
+    virtualControlsEnabled: boolean;
+    onToggleVirtualControls: () => void;
 }
 
-const ClassSelectionModal: React.FC<ClassSelectionModalProps> = ({ onSelectClass }) => {
+const ClassSelectionModal: React.FC<ClassSelectionModalProps> = ({ onSelectClass, virtualControlsEnabled, onToggleVirtualControls }) => {
     const [hoveredClass, setHoveredClass] = useState<ClassType | null>(null);
 
     // Helpers for stat bars
@@ -36,7 +38,17 @@ const ClassSelectionModal: React.FC<ClassSelectionModalProps> = ({ onSelectClass
     );
 
     return (
-        <div className="absolute inset-0 z-[100] bg-slate-950 flex flex-col overflow-hidden">
+        <div className="absolute inset-0 z-[100] bg-slate-950 flex flex-col overflow-hidden touch-auto">
+            {/* Control Toggle */}
+            <button 
+                onClick={onToggleVirtualControls}
+                className={`absolute top-4 right-4 z-50 p-2 rounded-full border-2 transition-all flex items-center gap-2 hover:scale-105 active:scale-95 ${virtualControlsEnabled ? 'bg-green-600 border-green-400 text-white' : 'bg-slate-800/80 border-slate-600 text-gray-400'}`}
+                title="Toggle Virtual Controls"
+            >
+                <Gamepad2 size={24} />
+                <span className="text-[10px] font-bold uppercase hidden md:inline">{virtualControlsEnabled ? 'ON' : 'OFF'}</span>
+            </button>
+
             {/* Dynamic Background */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-950 to-black z-0 pointer-events-none"></div>
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse z-0 pointer-events-none"></div>
@@ -52,7 +64,7 @@ const ClassSelectionModal: React.FC<ClassSelectionModalProps> = ({ onSelectClass
             </div>
 
             {/* Class Carousel - Ultra Compact sizing */}
-            <div className="relative z-10 flex-1 flex items-center justify-center p-2 overflow-x-auto overflow-y-hidden">
+            <div className="relative z-10 flex-1 flex items-center justify-center p-2 overflow-x-auto overflow-y-hidden touch-pan-x">
                 <div className="flex gap-2 px-4 items-center">
                     {(Object.entries(CLASS_INFOS) as [ClassType, typeof CLASS_INFOS[ClassType]][]).map(([key, info]) => {
                         const stats = getStats(key);
@@ -66,7 +78,7 @@ const ClassSelectionModal: React.FC<ClassSelectionModalProps> = ({ onSelectClass
                                 onMouseLeave={() => setHoveredClass(null)}
                                 onClick={() => onSelectClass(key)}
                                 className={`
-                                    relative group w-[160px] md:w-[190px] rounded-2xl border-2 cursor-pointer transition-all duration-300 ease-out flex flex-col overflow-hidden
+                                    relative group w-[160px] md:w-[190px] rounded-2xl border-2 cursor-pointer transition-all duration-300 ease-out flex flex-col overflow-hidden flex-shrink-0
                                     ${isHovered 
                                         ? 'scale-105 border-yellow-400 bg-slate-800 shadow-[0_0_20px_rgba(234,179,8,0.3)] z-20 -translate-y-1' 
                                         : 'border-slate-700 bg-slate-900/80 hover:border-slate-500'}

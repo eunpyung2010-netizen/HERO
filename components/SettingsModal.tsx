@@ -95,7 +95,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ bindings, onSave, mobileS
     );
 
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300 touch-auto">
             <div className="bg-slate-900 border-2 border-gray-600 rounded-2xl shadow-2xl w-full max-w-4xl h-full md:h-[90%] flex flex-col relative overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-4 flex justify-between items-center border-b border-gray-600 flex-shrink-0">

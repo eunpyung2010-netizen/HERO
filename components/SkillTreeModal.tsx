@@ -67,7 +67,7 @@ const SkillTreeModal: React.FC<SkillTreeModalProps> = ({ player, onClose, onUpgr
     ];
 
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300 touch-auto">
             <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-6xl h-[90%] flex flex-col relative overflow-hidden">
                 
                 {/* Header */}

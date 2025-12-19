@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Player } from '../types';
 import { UPGRADE_COSTS } from '../constants';
@@ -15,7 +16,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ player, onClose, onPurchase }) =>
     const mpCost = Math.floor(UPGRADE_COSTS.MP.base * Math.pow(UPGRADE_COSTS.MP.scale, Math.floor((player.maxMp - 100) / 30)));
 
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300 touch-auto">
             <div className="bg-slate-900 border-2 border-yellow-500 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-full">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-yellow-700 to-yellow-600 p-4 flex justify-between items-center border-b border-yellow-400 flex-shrink-0">
